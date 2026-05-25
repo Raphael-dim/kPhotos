@@ -1,0 +1,71 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.moved-aside
+*.xccheckout
+*.xcscmblueprint
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# Tuist
+Derived/
+Tuist/.build/
+Tuist/Dependencies/Lockfiles/
+*.xcodeproj
+*.xcworkspace
+!default.xcodeproj
+!default.xcworkspace
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+Packages/
+
+# Mise
+.mise.local.toml
+
+# Secrets / credentials
+*.xcconfig.local
+Secrets.xcconfig
+.env
+.env.*
+*.cer
+*.mobileprovision
+*.p8
+*.p12
+*.pem
+*.key
+
+# Logs
+*.log
+
+# AI agent local config
+.claude/
+.cursor/
+
+# Fastlane (si ajouté)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Periphery
+.periphery.results.json
+
+# IDE
+.vscode/
+.idea/
+*.swp

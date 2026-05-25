@@ -1,0 +1,23 @@
+project: kPhotos.xcodeproj
+schemes:
+  - kPhotos
+targets:
+  - kPhotos
+  - kPhotosCore
+  - kPhotosCoreUI
+  - kPhotosFeatures
+  - kPhotosShareExtension
+  - kPhotosWidget
+
+retain_public: true
+retain_assign_only_property: true
+retain_objc_accessible: true
+
+# Realm @Persisted properties sont accédées via Realm dynamic dispatch
+retain_unused_protocol_func_params: true
+
+# Patterns à ignorer
+report_exclude:
+  - "**/Generated/**"
+  - "**/*+Preview.swift"
+  - "**/Tuist/**"

@@ -1,0 +1,215 @@
+/*
+  Localizable.strings (fr) — kPhotos
+  Toute chaîne user-facing passe par ce fichier (cf. AGENTS.md §5).
+*/
+
+// Common
+"common.cancel" = "Annuler";
+"common.confirm" = "Confirmer";
+"common.delete" = "Supprimer";
+"common.share" = "Partager";
+"common.error.generic" = "Une erreur est survenue.";
+"common.retry" = "Réessayer";
+"common.close" = "Fermer";
+"common.done" = "OK";
+
+// Sign in (PAT mode — cf. AGENTS.md §20 "Auth strategy")
+"signIn.title" = "Connecte-toi à ton compte Infomaniak";
+"signIn.subtitle" = "kPhotos sauvegarde tes photos sur ton kDrive, en Suisse, chez Infomaniak.";
+"signIn.action" = "Se connecter à Infomaniak";
+"signIn.pat.title" = "Colle ton token API";
+"signIn.pat.subtitle" = "Pour accéder à ton kDrive, kPhotos a besoin d'un Personal Access Token créé sur Manager Infomaniak.";
+"signIn.pat.placeholder" = "Token API Infomaniak";
+"signIn.pat.action" = "Valider le token";
+"signIn.pat.openManager" = "Créer un token sur Manager";
+"signIn.pat.scopes" = "Scopes requis : drive, drive:file:read, drive:file:write, drive:management:read, drive:management:write";
+"signIn.pat.help" = "Manager → Mon profil → Tokens API → Créer un token. Durée : Illimité.";
+"signIn.pat.paste" = "Coller depuis le presse-papier";
+
+// Erreurs de validation du token
+"signIn.pat.error.empty" = "Le token ne peut pas être vide.";
+"signIn.pat.error.tooShort" = "Ce token est trop court pour être valide.";
+"signIn.pat.error.tooLong" = "Ce token est trop long pour être valide.";
+"signIn.pat.error.whitespace" = "Le token ne doit pas contenir d'espaces ni de retour à la ligne.";
+"signIn.pat.error.badCharacters" = "Le token contient des caractères inattendus. Vérifie que tu l'as copié intégralement, sans rien autour.";
+
+// Tutoriel token
+"signIn.pat.tutorial.howTo" = "Comment créer un token";
+"signIn.pat.tutorial.title" = "Créer un token API";
+"signIn.pat.tutorial.step1.title" = "Ouvrir Manager";
+"signIn.pat.tutorial.step1.body" = "Va sur manager.infomaniak.com, puis clique sur ton avatar en haut à droite.";
+"signIn.pat.tutorial.step2.title" = "Accéder à ton compte";
+"signIn.pat.tutorial.step2.body" = "Dans le menu qui apparaît, clique sur « Gérer mon compte ».";
+"signIn.pat.tutorial.step3.title" = "Section Développeur";
+"signIn.pat.tutorial.step3.body" = "Dans le menu de gauche, descends et clique sur « Développeur ».";
+"signIn.pat.tutorial.step4.title" = "Tokens API";
+"signIn.pat.tutorial.step4.body" = "Clique sur « Tokens API » pour accéder à la gestion des tokens.";
+"signIn.pat.tutorial.step5.title" = "Créer le token";
+"signIn.pat.tutorial.step5.body" = "Nomme-le « Token kPhotos », choisis Scopes « Tous » et Durée « Illimité », puis clique sur Créer.";
+
+// Timeline
+"timeline.title" = "Mes photos";
+"timeline.empty.title" = "Aucune photo pour le moment";
+"timeline.empty.subtitle" = "Vos photos apparaîtront ici dès qu'elles seront sauvegardées sur kDrive.";
+"timeline.library.title" = "Photothèque détectée";
+"timeline.library.subtitle" = "%d photo(s) et %d vidéo(s) sur cet appareil, prêtes à être sauvegardées.";
+"timeline.permission.title" = "Accès à la photothèque requis";
+"timeline.permission.subtitle" = "Autorise kPhotos à lire ta photothèque pour commencer la sauvegarde sur kDrive.";
+"timeline.permission.action" = "Autoriser";
+"timeline.permission.denied.title" = "Accès refusé";
+"timeline.permission.denied.subtitle" = "Ouvre les Réglages pour autoriser kPhotos à accéder à ta photothèque.";
+"timeline.noDrive.title" = "Aucun kDrive sélectionné";
+"timeline.noDrive.subtitle" = "Va dans Réglages pour choisir le kDrive de destination.";
+"timeline.sync.action" = "Synchroniser";
+"timeline.sync.done" = "%d photo(s) sauvegardée(s).";
+"timeline.section.count" = "%d élément(s)";
+"timeline.section.more" = "+%d en plus";
+"timeline.error.detail.title" = "Détail de l'erreur";
+"timeline.backup.failure.title" = "Sauvegarde impossible";
+"timeline.backup.retryItem" = "Réessayer cette photo";
+"timeline.backup.skipItem" = "Ignorer cette photo";
+"timeline.backup.retryAll" = "Tout réessayer";
+"timeline.backup.retryAll.count" = "Tout réessayer (%d)";
+"timeline.backup.retriedAll.toast" = "%d photo(s) reprogrammée(s) pour sauvegarde.";
+"timeline.selection.delete.title" = "Supprimer les photos";
+"timeline.selection.delete.message" = "Supprimer %d photo(s) ?";
+"timeline.selection.deleted" = "Photos supprimées";
+"timeline.selection.deletedCount" = "%d photo(s) supprimée(s)";
+"timeline.selection.deleting" = "Suppression de %d photo(s)…";
+"timeline.selection.addedToAlbum" = "Ajouté à %@";
+"timeline.selection.downloadedToLibrary" = "%d photo(s) ajoutées à la photothèque";
+
+// Erreurs de suppression
+"timeline.deletion.failed.toast" = "%d photo(s) n'ont pas pu être supprimées";
+"timeline.deletion.failure.title" = "Suppression impossible";
+"timeline.deletion.retryItem" = "Réessayer";
+"timeline.deletion.cancelItem" = "Annuler la suppression";
+
+// Sync Options
+"syncOptions.title" = "Options de synchronisation";
+"syncOptions.automatic.header" = "Sauvegarde automatique";
+"syncOptions.autoSync" = "Activer la sauvegarde automatique";
+"syncOptions.autoSync.footer" = "kPhotos planifiera des sauvegardes en arrière-plan selon les conditions ci-dessous. iOS choisit le moment exact ; pendant la nuit en charge et en Wi-Fi, c'est idéal.";
+"syncOptions.network.header" = "Réseau";
+"syncOptions.wifi" = "Wi-Fi";
+"syncOptions.cellular" = "Données cellulaires (4G/5G)";
+"syncOptions.network.footer" = "Au moins un réseau doit être autorisé. Si tu désactives les deux, kPhotos rétablira le Wi-Fi.";
+"syncOptions.media.header" = "Types de média";
+"syncOptions.photos" = "Photos";
+"syncOptions.videos" = "Vidéos";
+"syncOptions.media.footer" = "Choisis ce qui est sauvegardé. Les médias désactivés restent visibles dans la galerie mais ne sont pas envoyés sur kDrive.";
+
+// Albums
+"albums.title" = "Albums";
+"albums.create" = "Nouvel album";
+"albums.create.placeholder" = "Nom de l'album";
+"albums.noDrive.title" = "Aucun kDrive sélectionné";
+"albums.noDrive.subtitle" = "Choisis un kDrive de destination dans Réglages.";
+"albums.empty.title" = "Aucun album pour le moment";
+"albums.empty.subtitle" = "Crée ton premier album pour organiser tes photos.";
+"albums.addPhoto" = "Ajouter une photo";
+"albums.addPhoto.placeholder" = "ID du fichier kDrive";
+"albums.emptyAlbum.title" = "Aucune photo dans cet album";
+"albums.emptyAlbum.subtitle" = "Ajoute des photos via leur ID de fichier kDrive.";
+"albums.rename" = "Renommer";
+"albums.rename.title" = "Renommer l'album";
+"albums.delete" = "Supprimer l'album";
+"albums.delete.confirm.title" = "Supprimer cet album ?";
+"albums.delete.confirm.message" = "Seul l'album est supprimé — les photos qu'il contient restent sur ton kDrive.";
+"albums.photo.count" = "%d photo(s)";
+
+// Settings
+"settings.title" = "Réglages";
+"settings.account" = "Compte";
+"settings.storage" = "kDrive";
+"settings.sync" = "Synchronisation";
+"settings.drives.empty" = "Aucun kDrive trouvé sur ce compte.";
+"settings.signOut" = "Se déconnecter";
+"settings.signOut.confirm.title" = "Se déconnecter ?";
+"settings.signOut.confirm.message" = "Tu auras besoin de ton token API pour te reconnecter.";
+"settings.signOut.confirm.action" = "Se déconnecter";
+"settings.folder.header" = "Dossier de destination";
+"settings.folder.placeholder" = "kPhotos";
+"settings.folder.footer" = "Nom du dossier où vos photos sont stockées dans l'espace privé du kDrive sélectionné.";
+"settings.appearance" = "Apparence";
+"settings.theme.system" = "Système";
+"settings.theme.light" = "Clair";
+"settings.theme.dark" = "Sombre";
+
+// Onboarding
+"onboarding.welcome.title" = "Bienvenue dans kPhotos";
+"onboarding.welcome.subtitle" = "Vos photos sauvegardées en Suisse, sur votre kDrive.";
+"onboarding.permission.photos" = "Accéder à votre photothèque";
+"onboarding.permission.photos.subtitle" = "Pour synchroniser vos photos vers kDrive.";
+
+// Upload
+"upload.status.pending" = "En attente";
+"upload.status.uploading" = "Envoi en cours";
+"upload.status.synced" = "Sauvegardé";
+"upload.status.error" = "Échec — réessayer";
+
+// Viewer
+"viewer.addToAlbum" = "Ajouter à un album";
+"viewer.saveToLibrary" = "Enregistrer dans la Photothèque";
+"viewer.saveToLibrarySuccess" = "Enregistré dans la Photothèque";
+"viewer.delete" = "Supprimer";
+"viewer.delete.confirm.title" = "Supprimer cette photo ?";
+"viewer.delete.confirm.message" = "Le fichier sera supprimé de kDrive.";
+"viewer.albums.empty" = "Aucun album pour le moment.";
+"viewer.selectAlbum.title" = "Choisir un album";
+
+// Viewer — Info
+"viewer.info.title" = "Informations";
+"viewer.info.file.section" = "Fichier";
+"viewer.info.date.section" = "Date";
+"viewer.info.camera.section" = "Appareil photo";
+"viewer.info.location.section" = "Localisation";
+"viewer.info.kdrive.section" = "kDrive";
+"viewer.info.video.section" = "Vidéo";
+"viewer.info.name" = "Nom";
+"viewer.info.size" = "Taille";
+"viewer.info.type" = "Type";
+"viewer.info.resolution" = "Résolution";
+"viewer.info.takenAt" = "Prise de vue";
+"viewer.info.addedAt" = "Ajouté à kDrive";
+"viewer.info.duration" = "Durée";
+"viewer.info.make" = "Appareil";
+"viewer.info.lens" = "Objectif";
+"viewer.info.aperture" = "Ouverture";
+"viewer.info.shutter" = "Vitesse";
+"viewer.info.iso" = "ISO";
+"viewer.info.focalLength" = "Focale";
+"viewer.info.path" = "Chemin";
+"viewer.info.hash" = "Empreinte";
+"viewer.info.coordinates" = "Coordonnées";
+"viewer.info.openInMaps" = "Ouvrir dans Plans";
+"viewer.info.locationUnknown" = "Localisation inconnue";
+
+// Map
+"map.tab.title" = "Carte";
+"map.title" = "Vos photos sur la carte";
+"map.subtitle" = "%d photo(s) géolocalisée(s)";
+"map.loading" = "Chargement de la carte…";
+"map.empty.title" = "Aucune photo géolocalisée";
+"map.empty.subtitle" = "Les photos prises avec un lieu apparaîtront ici. Sauvegarde d'abord tes photos depuis cet appareil pour qu'elles soient placées sur la carte.";
+"map.permission.title" = "Accès à la photothèque requis";
+"map.permission.subtitle" = "kPhotos utilise les coordonnées GPS conservées par iOS pour placer tes photos sur la carte.";
+"map.permission.denied.subtitle" = "Ouvre les Réglages pour autoriser kPhotos à lire les métadonnées de localisation de tes photos.";
+"map.allowAccess" = "Autoriser l'accès";
+"map.openSettings" = "Ouvrir les Réglages";
+"map.sheet.title" = "%d photo(s) à cet endroit";
+"map.places.section.title" = "Lieux";
+"map.places.items.count" = "%d élément(s)";
+
+// Folder Picker
+"folderPicker.title" = "Sélectionner le dossier de destination";
+"folderPicker.selectThisFolder" = "Utiliser ce dossier";
+"folderPicker.rootNotSelectable" = "Choisissez un sous-dossier pour stocker vos photos";
+"folderPicker.createNewFolder" = "Créer un nouveau dossier";
+"folderPicker.subfolders" = "Dossiers";
+"folderPicker.noSubfolders" = "Aucun sous-dossier";
+"folderPicker.folderNamePlaceholder" = "Nom du dossier";
+"folderPicker.back" = "Retour";
+
+// Common additional
+"common.create" = "Créer";

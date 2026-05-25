@@ -1,0 +1,58 @@
+# SwiftFormat — kPhotos
+# https://github.com/nicklockwood/SwiftFormat
+
+--swiftversion 5.10
+--maxwidth 130
+--indent 4
+--linebreaks lf
+--tabwidth unspecified
+
+# Imports
+--importgrouping alpha
+
+# Rules
+--enable isEmpty
+--enable sortedImports
+--enable redundantSelf
+--enable redundantParens
+--enable redundantReturn
+--enable redundantType
+--enable redundantVoidReturnType
+--enable strongifiedSelf
+--enable trailingCommas
+--enable wrapMultilineStatementBraces
+--enable blankLinesBetweenScopes
+--enable consecutiveBlankLines
+--enable consecutiveSpaces
+--enable spaceAroundOperators
+--enable spaceAroundBraces
+--enable spaceInsideBraces
+--enable spaceInsideBrackets
+--enable spaceInsideParens
+--enable indent
+--enable trailingSpace
+--enable preferKeyPath
+--enable wrapArguments
+--enable wrapEnumCases
+--enable redundantInit
+
+# Disabled (conflicts with SwiftUI patterns or aesthetics)
+--disable hoistPatternLet
+--disable wrapMultilineFunctionChains
+
+# Options
+--self init-only
+--selfrequired SwiftUI
+--patternlet inline
+--stripunusedargs closure-only
+--wraparguments before-first
+--wrapparameters before-first
+--wrapcollections before-first
+--closingparen balanced
+--commas inline
+--trimwhitespace always
+--ifdef no-indent
+--header "/*\n kPhotos - iOS client for kDrive\n Copyright (C) {year} Raphaël Dimeck\n\n This program is free software: you can redistribute it and/or modify\n it under the terms of the GNU General Public License as published by\n the Free Software Foundation, either version 3 of the License, or\n (at your option) any later version.\n\n This program is distributed in the hope that it will be useful,\n but WITHOUT ANY WARRANTY; without even the implied warranty of\n MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n GNU General Public License for more details.\n\n You should have received a copy of the GNU General Public License\n along with this program.  If not, see <http://www.gnu.org/licenses/>.\n */"
+
+# Exclusions
+--exclude Derived,Tuist/.build,**/.build,**/Generated

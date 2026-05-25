@@ -1,0 +1,32 @@
+kPhotos
+Copyright (C) 2025 Raphaël Dimeck
+
+This program is licensed under the GNU General Public License v3.0
+(see LICENSE for the full text).
+
+----------------------------------------------------------------------
+
+DISCLAIMER
+
+kPhotos is an independent, community-developed iOS client for kDrive.
+It is NOT an official Infomaniak product and is NOT affiliated with,
+endorsed by, or sponsored by Infomaniak Network SA.
+
+The project uses the public kDrive HTTP API. "Infomaniak", "kDrive"
+and related marks are trademarks of Infomaniak Network SA and are
+referenced here solely to describe the service this application
+interoperates with.
+
+----------------------------------------------------------------------
+
+THIRD-PARTY SOFTWARE
+
+This program incorporates the following third-party libraries:
+
+- Alamofire — MIT License
+  https://github.com/Alamofire/Alamofire
+
+- Realm Swift — Apache License 2.0
+  https://github.com/realm/realm-swift
+
+Their respective license texts apply to those components.

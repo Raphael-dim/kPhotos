@@ -1,0 +1,24 @@
+parent_config: .swiftlint.yml
+
+strict: true
+
+line_length:
+  warning: 130
+  error: 130
+
+force_unwrapping:
+  severity: error
+
+implicitly_unwrapped_optional:
+  severity: error
+
+file_header:
+  severity: error
+
+custom_rules:
+  no_raw_user_string:
+    name: "Raw user-facing strings"
+    regex: 'Text\("[^"]+"\)'
+    message: "Strings user-facing doivent passer par kPhotosResources."
+    severity: error
+    excluded: ".*(Tests|Preview|Widget/.*Preview).*"
