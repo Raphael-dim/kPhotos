@@ -97,7 +97,8 @@ public final class FolderPickerViewModel: ObservableObject {
             }
             subfolders = folders.map { file in
                 FolderNode(folderId: file.id, name: file.name)
-            }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription

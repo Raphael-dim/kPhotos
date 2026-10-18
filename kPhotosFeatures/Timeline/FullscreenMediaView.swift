@@ -21,8 +21,6 @@ import kPhotosCoreUI
 import kPhotosResources
 import SwiftUI
 
-// MARK: - FullscreenMediaView
-
 public struct FullscreenMediaView: View {
     @StateObject private var actionsVM = ViewerActionsViewModel()
     private let media: [ViewerMedia]
@@ -174,8 +172,6 @@ public struct FullscreenMediaView: View {
         }
     }
 
-    // MARK: Pager
-
     /// Pile de pages média positionnées côte à côte. Seules les pages de
     /// `windowIndices` sont montées ; chacune est décalée d'une largeur d'écran
     /// par rapport à la page courante, `horizontalDrag` ajoutant le suivi du
@@ -241,8 +237,6 @@ public struct FullscreenMediaView: View {
             horizontalDrag = 0
         }
     }
-
-    // MARK: Legacy swipe (iOS 16–17)
 
     /// Un seul `DragGesture` arbitre les deux interactions qui, sinon, se
     /// disputeraient le doigt :
@@ -310,12 +304,6 @@ public struct FullscreenMediaView: View {
 }
 
 private extension FullscreenMediaView {
-    // MARK: Controls overlay
-
-    /// Layout des contrôles façon iOS 26 Photos : trois pilules glass flottantes en
-    /// haut (back / titre / menu) et trois pilules en bas (partager / actions / corbeille),
-    /// au-dessus de la safe area. Plus de gradient noir plein écran : chaque contrôle
-    /// est isolé, ce qui rend la photo en arrière-plan beaucoup plus visible.
     @ViewBuilder private var controlsOverlay: some View {
         VStack(spacing: 0) {
             topBar
@@ -432,8 +420,6 @@ private extension FullscreenMediaView {
         }
     }
 
-    // MARK: Download
-
     private func downloadCurrentPhoto() {
         Task {
             guard case .cloud(let snapshot) = currentMedia else { return }
@@ -446,8 +432,6 @@ private extension FullscreenMediaView {
             withAnimation { downloadToast = nil }
         }
     }
-
-    // MARK: Album picker
 
     private var albumPickerSheet: some View {
         NavigationStack {
@@ -485,8 +469,6 @@ private extension FullscreenMediaView {
         }
     }
 
-    // MARK: Info sheet
-
     private var photoInfoSheet: some View {
         NavigationStack {
             PhotoInfoView(media: currentMedia)
@@ -500,83 +482,9 @@ private extension FullscreenMediaView {
         }
     }
 
-    // MARK: Date helpers
-
     private func pillDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEEE · HH:mm"
         return formatter.string(from: date).capitalized
-    }
-}
-
-// MARK: - DownloadToast
-
-private enum DownloadToast: Equatable {
-    case success
-    /// Transporte le message localisé de l'erreur pour l'afficher directement.
-    case failure(String)
-}
-
-private struct DownloadToastBanner: View {
-    let toast: DownloadToast
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: isSuccess ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .foregroundStyle(isSuccess ? .green : .red)
-            Text(message)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.primary)
-                .multilineTextAlignment(.leading)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial, in: Capsule())
-    }
-
-    private var isSuccess: Bool { toast == .success }
-
-    private var message: String {
-        switch toast {
-        case .success: L10n.Viewer.saveToLibrarySuccess
-        case .failure(let msg): msg
-        }
-    }
-}
-
-// MARK: - Glass Pill Helper
-
-private extension View {
-    @ViewBuilder
-    func viewerControlStyle() -> some View {
-        if #available(iOS 26.0, *) {
-            self.buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-                .controlSize(.regular)
-        } else {
-            buttonStyle(.plain)
-                .padding(12)
-                .background(.ultraThinMaterial, in: Circle())
-        }
-    }
-
-    /// Pilule glass hybride : sur iOS 26+ on bénéficie du nouveau matériau Liquid
-    /// Glass (avec reflets et distorsions), sur iOS 16-25 on retombe sur
-    /// `ultraThinMaterial` + liseré fin pour mimer l'effet. Le compilateur ne
-    /// connaît `glassEffect` que si on build avec le SDK iOS 26+ ; on garde donc
-    /// la branche en `#if compiler(>=6.2)` (Swift 6.2 = Xcode 26 = SDK iOS 26).
-    @ViewBuilder
-    func glassPill(in shape: some InsettableShape) -> some View {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *) {
-            self.glassEffect(.regular, in: shape)
-        } else {
-            background(.ultraThinMaterial, in: shape)
-                .overlay(shape.strokeBorder(.white.opacity(0.18), lineWidth: 0.5))
-        }
-        #else
-        background(.ultraThinMaterial, in: shape)
-            .overlay(shape.strokeBorder(.white.opacity(0.18), lineWidth: 0.5))
-        #endif
     }
 }

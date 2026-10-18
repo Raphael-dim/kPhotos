@@ -146,66 +146,13 @@ public final class PHAssetExporterImpl: PHAssetExporting {
         do {
             let destination = directory.appendingPathComponent(fileName)
             try await writeResource(primary, to: destination)
-            var additional: [ExportedResource] = []
-            var descriptors: [[String: Any]] = [[
-                "fileName": fileName,
-                "originalFilename": primary.originalFilename,
-                "resourceType": primary.type.rawValue
-            ]]
-            for (index, resource) in resources.enumerated() where resource !== primary {
-                try Task.checkCancellation()
-                let ext = (resource.originalFilename as NSString).pathExtension
-                let name = (fileName as NSString).deletingPathExtension
-                    + "__kphotos_resource_\(resource.type.rawValue)_\(index)." + (ext.isEmpty ? "dat" : ext)
-                let url = directory.appendingPathComponent(name)
-                try await writeResource(resource, to: url)
-                additional.append(ExportedResource(
-                    fileURL: url,
-                    fileName: name,
-                    mimeType: Self.mimeType(from: resource.uniformTypeIdentifier),
-                    resourceType: resource.type.rawValue,
-                    originalFilename: resource.originalFilename
-                ))
-                descriptors.append([
-                    "fileName": name,
-                    "originalFilename": resource.originalFilename,
-                    "resourceType": resource.type.rawValue
-                ])
-            }
+            let additional = try await exportCompanions(resources, primary: primary, fileName: fileName, directory: directory)
+            let descriptors = Self.resourceDescriptors(primary: primary, fileName: fileName, additional: additional)
             // Fail closed if PhotoKit reports a Live Photo without its motion resource.
             if asset.mediaSubtypes.contains(.photoLive), !resources.contains(where: { $0.type == .pairedVideo }) {
                 throw BackupSafetyError.incomplete
             }
-            var metadata: [String: Any] = [
-                "version": 1,
-                "localIdentifier": asset.localIdentifier,
-                "createdAt": creationDate.timeIntervalSince1970,
-                "isFavorite": asset.isFavorite,
-                "isHidden": asset.isHidden,
-                "pixelWidth": asset.pixelWidth,
-                "pixelHeight": asset.pixelHeight,
-                "duration": asset.duration,
-                "mediaType": asset.mediaType.rawValue,
-                "mediaSubtypes": asset.mediaSubtypes.rawValue,
-                "resources": descriptors
-            ]
-            if let date = asset.modificationDate { metadata["modifiedAt"] = date.timeIntervalSince1970 }
-            if let id = asset.burstIdentifier { metadata["burstIdentifier"] = id }
-            if let location = asset.location {
-                metadata["location"] = [
-                    "latitude": location.coordinate.latitude,
-                    "longitude": location.coordinate.longitude,
-                    "altitude": location.altitude,
-                    "horizontalAccuracy": location.horizontalAccuracy,
-                    "verticalAccuracy": location.verticalAccuracy
-                ]
-            }
-            var albums: [[String: String]] = []
-            PHAssetCollection.fetchAssetCollectionsContaining(asset, with: .album, options: nil)
-                .enumerateObjects { album, _, _ in
-                    albums.append(["identifier": album.localIdentifier, "title": album.localizedTitle ?? ""])
-                }
-            metadata["albums"] = albums
+            let metadata = Self.metadata(for: asset, createdAt: creationDate, descriptors: descriptors)
             var exported = ExportedAsset(
                 localIdentifier: asset.localIdentifier,
                 fileURL: destination,
@@ -227,6 +174,79 @@ public final class PHAssetExporterImpl: PHAssetExporting {
             try? fileManager.removeItem(at: directory) // Only this export's temporary resources.
             throw error
         }
+    }
+
+    private func exportCompanions(
+        _ resources: [PHAssetResource], primary: PHAssetResource, fileName: String, directory: URL
+    ) async throws -> [ExportedResource] {
+        var additional: [ExportedResource] = []
+        for (index, resource) in resources.enumerated() where resource !== primary {
+            try Task.checkCancellation()
+            let ext = (resource.originalFilename as NSString).pathExtension
+            let name = (fileName as NSString).deletingPathExtension
+                + "__kphotos_resource_\(resource.type.rawValue)_\(index)." + (ext.isEmpty ? "dat" : ext)
+            let url = directory.appendingPathComponent(name)
+            try await writeResource(resource, to: url)
+            additional.append(ExportedResource(
+                fileURL: url,
+                fileName: name,
+                mimeType: Self.mimeType(from: resource.uniformTypeIdentifier),
+                resourceType: resource.type.rawValue,
+                originalFilename: resource.originalFilename
+            ))
+        }
+        return additional
+    }
+
+    private static func resourceDescriptors(
+        primary: PHAssetResource, fileName: String, additional: [ExportedResource]
+    ) -> [[String: Any]] {
+        let primaryDescriptor: [String: Any] = [
+            "fileName": fileName,
+            "originalFilename": primary.originalFilename,
+            "resourceType": primary.type.rawValue
+        ]
+        return [primaryDescriptor] + additional.map {
+            ["fileName": $0.fileName, "originalFilename": $0.originalFilename, "resourceType": $0.resourceType]
+        }
+    }
+
+    private static func metadata(
+        for asset: PHAsset,
+        createdAt creationDate: Date,
+        descriptors: [[String: Any]]
+    ) -> [String: Any] {
+        var metadata: [String: Any] = [
+            "version": 1,
+            "localIdentifier": asset.localIdentifier,
+            "createdAt": creationDate.timeIntervalSince1970,
+            "isFavorite": asset.isFavorite,
+            "isHidden": asset.isHidden,
+            "pixelWidth": asset.pixelWidth,
+            "pixelHeight": asset.pixelHeight,
+            "duration": asset.duration,
+            "mediaType": asset.mediaType.rawValue,
+            "mediaSubtypes": asset.mediaSubtypes.rawValue,
+            "resources": descriptors
+        ]
+        if let date = asset.modificationDate { metadata["modifiedAt"] = date.timeIntervalSince1970 }
+        if let id = asset.burstIdentifier { metadata["burstIdentifier"] = id }
+        if let location = asset.location {
+            metadata["location"] = [
+                "latitude": location.coordinate.latitude,
+                "longitude": location.coordinate.longitude,
+                "altitude": location.altitude,
+                "horizontalAccuracy": location.horizontalAccuracy,
+                "verticalAccuracy": location.verticalAccuracy
+            ]
+        }
+        var albums: [[String: String]] = []
+        PHAssetCollection.fetchAssetCollectionsContaining(asset, with: .album, options: nil)
+            .enumerateObjects { album, _, _ in
+                albums.append(["identifier": album.localIdentifier, "title": album.localizedTitle ?? ""])
+            }
+        metadata["albums"] = albums
+        return metadata
     }
 
     // MARK: - Helpers

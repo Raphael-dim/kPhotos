@@ -80,7 +80,7 @@ public final class AuthServiceImpl: AuthService {
         guard config.isConfigured else { throw AuthError.notConfigured }
         let state = UUID().uuidString
         let pkce = PKCEChallenge()
-        let url = oauth.buildAuthorizationURL(state: state, pkce: pkce)
+        let url = try oauth.buildAuthorizationURL(state: state, pkce: pkce)
 
         let callbackURL = try await webAuth.presentAuthorization(
             url: url,

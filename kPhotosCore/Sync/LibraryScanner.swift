@@ -34,10 +34,16 @@ struct LibraryScanner {
         ].contains(name)
     }
 
+    struct Result {
+        let photos: [PhotoSnapshot]
+        let fileIds: Set<String>
+        let revisions: [String: String]
+    }
+
     func scan(
         driveId: Int,
         rootId: String
-    ) async throws -> (photos: [PhotoSnapshot], fileIds: Set<String>, revisions: [String: String]) {
+    ) async throws -> Result {
         var folders = [rootId]
         var visited = Set<String>()
         var media: [RemoteFileDTO] = []
@@ -70,7 +76,7 @@ struct LibraryScanner {
             snapshot.libraryRootId = rootId
             return snapshot
         }
-        return (photos, fileIds, revisions)
+        return Result(photos: photos, fileIds: fileIds, revisions: revisions)
     }
 }
 

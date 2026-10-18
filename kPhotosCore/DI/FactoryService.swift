@@ -29,6 +29,7 @@ public enum FactoryService {
         registerManagers()
         registerGallery()
         registerSync()
+        registerBackup()
     }
 
     private static func registerInfrastructure() {
@@ -178,6 +179,9 @@ public enum FactoryService {
                 publisher: resolve()
             )
         })
+    }
+
+    private static func registerBackup() {
         store.store(factory: Factory(type: PhotoSyncing.self) { _, _ in
             PhotoSyncEngine(
                 api: resolve(),

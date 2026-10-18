@@ -73,17 +73,17 @@ private enum InfoFormat {
     }
 
     static func date(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateStyle = .full
-        f.timeStyle = .medium
-        return f.string(from: date)
+        let formatter = DateFormatter()
+        formatter.dateStyle = .full
+        formatter.timeStyle = .medium
+        return formatter.string(from: date)
     }
 
     static func duration(_ seconds: Double) -> String {
-        let s = Int(seconds)
-        return s >= 3600
-            ? String(format: "%d:%02d:%02d", s / 3600, (s % 3600) / 60, s % 60)
-            : String(format: "%d:%02d", s / 60, s % 60)
+        let duration = Int(seconds)
+        return duration >= 3600
+            ? String(format: "%d:%02d:%02d", duration / 3600, (duration % 3600) / 60, duration % 60)
+            : String(format: "%d:%02d", duration / 60, duration % 60)
     }
 
     static func shutter(_ seconds: Double) -> String {
@@ -207,8 +207,8 @@ private struct CloudPhotoInfoView: View {
             InfoRow(label: L10n.Viewer.Info.name, value: photo.name)
             InfoRow(label: L10n.Viewer.Info.type, value: photo.isVideo ? L10n.Viewer.Info.videoType : L10n.Viewer.Info.photoType)
             InfoRow(label: L10n.Viewer.Info.size, value: InfoFormat.size(photo.size))
-            if let exif = vm.exif, let w = exif.pixelWidth, let h = exif.pixelHeight {
-                InfoRow(label: L10n.Viewer.Info.resolution, value: InfoFormat.resolution(width: w, height: h))
+            if let exif = vm.exif, let width = exif.pixelWidth, let height = exif.pixelHeight {
+                InfoRow(label: L10n.Viewer.Info.resolution, value: InfoFormat.resolution(width: width, height: height))
             }
         }
     }
@@ -251,11 +251,11 @@ private struct CloudPhotoInfoView: View {
             if let lens = exif.lens {
                 InfoRow(label: L10n.Viewer.Info.lens, value: lens)
             }
-            if let f = exif.fNumber {
-                InfoRow(label: L10n.Viewer.Info.aperture, value: String(format: "f/%.1f", f))
+            if let aperture = exif.fNumber {
+                InfoRow(label: L10n.Viewer.Info.aperture, value: String(format: "f/%.1f", aperture))
             }
-            if let t = exif.exposureTime {
-                InfoRow(label: L10n.Viewer.Info.shutter, value: InfoFormat.shutter(t))
+            if let exposure = exif.exposureTime {
+                InfoRow(label: L10n.Viewer.Info.shutter, value: InfoFormat.shutter(exposure))
             }
             if let iso = exif.isoSpeed {
                 InfoRow(label: L10n.Viewer.Info.iso, value: "\(iso)")

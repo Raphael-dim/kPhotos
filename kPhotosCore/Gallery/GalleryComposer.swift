@@ -243,36 +243,43 @@ public final class GalleryComposerImpl: GalleryComposing {
             }
         }
         if let cloud, cloud.syncStatus == .synced, cloud.backupComplete { return .synced }
-        if let backupItem {
-            switch backupItem.state {
-            case .queued: return .pendingUpload
-            case .uploading: return .uploading(fraction: nil)
-            case .completed: return .localOnly
-            case .failedTransient:
-                // Volontairement silencieux côté UI — l'item sera retenté
-                // automatiquement après son `nextRetryAt`. Pas de badge orange
-                // qui alarmerait l'utilisateur pour un flake passager (réseau,
-                // 429, iCloud temporairement indispo). Le badge gris classique
-                // reflète juste "pas encore sauvegardé", c'est la vérité.
-                return .localOnly
-            case .failedPermanent:
-                return .uploadFailed(reason: backupItem.lastErrorReason)
-            case .skipped:
-                // Visuellement on garde le nuage barré gris — l'utilisateur a
-                // choisi de ne pas backupper. Phase 2b ajoutera une variante visuelle.
-                return .localOnly
-            }
-        }
+        if let backupItem { return backupState(from: backupItem) }
         if let cloud, cloud.syncStatus == .error {
             return .uploadFailed(reason: "")
         }
         return .localOnly
     }
 
+    private static func backupState(from backupItem: BackupItemSnapshot) -> GalleryItemSyncState {
+        switch backupItem.state {
+        case .queued: return .pendingUpload
+        case .uploading: return .uploading(fraction: nil)
+        case .completed: return .localOnly
+        case .failedTransient:
+            // Volontairement silencieux côté UI — l'item sera retenté
+            // automatiquement après son `nextRetryAt`. Pas de badge orange
+            // qui alarmerait l'utilisateur pour un flake passager (réseau,
+            // 429, iCloud temporairement indispo). Le badge gris classique
+            // reflète juste "pas encore sauvegardé", c'est la vérité.
+            return .localOnly
+        case .failedPermanent:
+            return .uploadFailed(reason: backupItem.lastErrorReason)
+        case .skipped:
+            // Visuellement on garde le nuage barré gris — l'utilisateur a
+            // choisi de ne pas backupper. Phase 2b ajoutera une variante visuelle.
+            return .localOnly
+        }
+    }
+
     // MARK: - Group
 
     static func groupByMonth(items: [GalleryItem], calendar: Calendar) -> [GallerySection] {
-        var buckets: [String: (year: Int, month: Int, items: [GalleryItem])] = [:]
+        struct MonthBucket {
+            let year: Int
+            let month: Int
+            var items: [GalleryItem]
+        }
+        var buckets: [String: MonthBucket] = [:]
         var order: [String] = []
 
         for item in items {
@@ -280,7 +287,7 @@ public final class GalleryComposerImpl: GalleryComposing {
             guard let year = components.year, let month = components.month else { continue }
             let key = "\(year)-\(String(format: "%02d", month))"
             if buckets[key] == nil {
-                buckets[key] = (year, month, [])
+                buckets[key] = MonthBucket(year: year, month: month, items: [])
                 order.append(key)
             }
             buckets[key]?.items.append(item)

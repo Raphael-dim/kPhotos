@@ -163,9 +163,7 @@ final class LibrarySafetyTests: XCTestCase {
         candidate.libraryRootId = "root"
         let result = try await ResourceBackup(api: api).findOrUpload(
             resource: resource,
-            date: Date(),
-            token: "test",
-            localIdentifier: "local-photo",
+            identity: .init(date: Date(), token: "test", localIdentifier: "local-photo"),
             driveId: 7,
             folderId: "root",
             candidates: [candidate]
@@ -182,9 +180,7 @@ final class LibrarySafetyTests: XCTestCase {
 
         let result = try await ResourceBackup(api: api).findOrUpload(
             resource: resource,
-            date: Date(),
-            token: "retry",
-            localIdentifier: "local-photo",
+            identity: .init(date: Date(), token: "retry", localIdentifier: "local-photo"),
             driveId: 7,
             folderId: "root",
             candidates: []
@@ -249,9 +245,7 @@ final class LibrarySafetyTests: XCTestCase {
 
         let result = try await ResourceBackup(api: api).findOrUpload(
             resource: resource,
-            date: Date(),
-            token: "second-token",
-            localIdentifier: "second-local",
+            identity: .init(date: Date(), token: "second-token", localIdentifier: "second-local"),
             driveId: 7,
             folderId: "root",
             candidates: [candidate]
@@ -270,9 +264,7 @@ final class LibrarySafetyTests: XCTestCase {
         let candidate = PhotoSyncEngine.makeSnapshot(from: file("mac", size: 9), driveId: 7)
         _ = try await ResourceBackup(api: api).findOrUpload(
             resource: resource,
-            date: Date(),
-            token: "test",
-            localIdentifier: "local-photo",
+            identity: .init(date: Date(), token: "test", localIdentifier: "local-photo"),
             driveId: 7,
             folderId: "root",
             candidates: [candidate]
@@ -288,9 +280,7 @@ final class LibrarySafetyTests: XCTestCase {
         do {
             _ = try await ResourceBackup(api: api).findOrUpload(
                 resource: resource,
-                date: Date(),
-                token: "test",
-                localIdentifier: "local-photo",
+                identity: .init(date: Date(), token: "test", localIdentifier: "local-photo"),
                 driveId: 7,
                 folderId: "root",
                 candidates: []

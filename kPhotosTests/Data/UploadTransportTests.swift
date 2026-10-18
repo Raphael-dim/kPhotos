@@ -30,6 +30,38 @@ final class UploadTransportTests: XCTestCase {
         super.tearDown()
     }
 
+    func testSimpleUploadPreservesSourceBytesAndCaptureMetadata() async throws {
+        let fixture = try UploadFixture(size: 7)
+        defer { fixture.cleanup() }
+        let name = "original (1).heic"
+        StubKDriveProtocol.handler = { request in
+            let url = try XCTUnwrap(request.url)
+            let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
+            let items = try XCTUnwrap(components.queryItems)
+            let query = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value ?? "") })
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(url.path, "/3/drive/7/upload")
+            XCTAssertEqual(query["directory_id"], "42")
+            XCTAssertEqual(query["file_name"], name)
+            XCTAssertEqual(query["created_at"], "123456789")
+            XCTAssertEqual(query["client_token"], fixture.clientToken)
+            XCTAssertEqual(query["total_size"], "7")
+            XCTAssertEqual(query["conflict"], "error")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/octet-stream")
+            XCTAssertEqual(try Self.body(request), Data(repeating: 0x61, count: 7))
+            return ["result": "success", "data": ["id": 123, "name": name, "size": 7]]
+        }
+        let file = try await api().upload(
+            driveId: 7,
+            folderId: "42",
+            source: .init(fileURL: fixture.url, fileName: name, mimeType: "image/heic"),
+            createdAt: Date(timeIntervalSince1970: 123_456_789),
+            clientToken: fixture.clientToken
+        )
+        XCTAssertEqual(file.id, "123")
+        XCTAssertEqual(file.name, name)
+    }
+
     func testLargeUploadUsesTwoHashedChunksAndPreservesCaptureDate() async throws {
         let fixture = try UploadFixture(size: PhotoApiFetcher.chunkSize + 7)
         defer { fixture.cleanup() }
@@ -74,10 +106,8 @@ final class UploadTransportTests: XCTestCase {
         let file = try await api().upload(
             driveId: 7,
             folderId: "42",
-            fileURL: fixture.url,
-            fileName: "video.mov",
+            source: .init(fileURL: fixture.url, fileName: "video.mov", mimeType: "video/quicktime"),
             createdAt: Date(timeIntervalSince1970: 123_456_789),
-            mimeType: "video/quicktime",
             clientToken: fixture.clientToken
         )
         XCTAssertEqual(file.id, "123")
@@ -117,10 +147,8 @@ final class UploadTransportTests: XCTestCase {
         _ = try await api().upload(
             driveId: 7,
             folderId: "42",
-            fileURL: fixture.url,
-            fileName: "video.mov",
+            source: .init(fileURL: fixture.url, fileName: "video.mov", mimeType: "video/quicktime"),
             createdAt: Date(timeIntervalSince1970: 123_456_789),
-            mimeType: "video/quicktime",
             clientToken: fixture.clientToken
         )
         XCTAssertEqual(chunks, 1)
@@ -139,8 +167,7 @@ final class UploadTransportTests: XCTestCase {
             _ = try await api().uploadChunked(
                 driveId: 7,
                 folderId: "42",
-                fileURL: fixture.url,
-                fileName: "video.mov",
+                source: .init(fileURL: fixture.url, fileName: "video.mov", mimeType: "video/quicktime"),
                 createdAt: Date(),
                 totalSize: 7,
                 clientToken: fixture.clientToken

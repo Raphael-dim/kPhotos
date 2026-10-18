@@ -179,15 +179,7 @@ public final class PhotoSyncEngine: PhotoSyncing {
         maxItems: Int?,
         onProgress: @MainActor @escaping (SyncProgress) -> Void
     ) async throws {
-        let snapshot = try settings.current()
-
-        // Validation aux frontières (§Fail fast AGENTS.md).
-        guard reachability.allowsSync(under: snapshot.networkPolicy) else {
-            throw SyncPolicyError.networkNotAllowed(
-                current: reachability.currentKind(),
-                policy: snapshot.networkPolicy
-            )
-        }
+        try validateNetworkPolicy()
 
         // Une lecture récursive de toute la bibliothèque cloud pouvait prendre
         // des minutes avant le premier upload. ResourceBackup vérifie chaque
@@ -220,7 +212,12 @@ public final class PhotoSyncEngine: PhotoSyncing {
 
             let progressedName: String?
             do {
-                let result = try await uploadOne(item: item, driveId: driveId, folderId: folderId, backup: resourceBackup)
+                let result = try await uploadOne(
+                    item: item,
+                    driveId: driveId,
+                    folderId: folderId,
+                    backup: resourceBackup
+                )
                 try await backupQueueWriter.markCompleted(localIdentifier: item.localIdentifier)
                 verifiedCount += 1
                 uploadQueue.mark(localIdentifier: item.localIdentifier, state: .completed)
@@ -306,15 +303,7 @@ public final class PhotoSyncEngine: PhotoSyncing {
         guard let asset = fetch.firstObject else { throw ExportError.noResource }
         let exported = try await exporter.export(asset)
         let manifestURL = exported.fileURL.deletingLastPathComponent().appendingPathComponent(exported.fileName + ".kphotos.json")
-        defer {
-            for url in [exported.fileURL, manifestURL] + exported.additionalResources.map(\.fileURL) {
-                try? fileManager.removeItem(at: url) // Files owned by this temporary export only.
-            }
-            let directory = exported.fileURL.deletingLastPathComponent()
-            if directory.deletingLastPathComponent().lastPathComponent == "kPhotosExports" {
-                try? fileManager.removeItem(at: directory)
-            }
-        }
+        defer { cleanupExport(exported, manifestURL: manifestURL) }
         let destination = try await backup.destination(driveId: driveId, rootId: folderId, date: exported.takenAt)
         let candidates = try photoReader.allPhotos().filter {
             $0.driveId == driveId && $0.libraryRootId == folderId && $0.isAvailable
@@ -331,16 +320,56 @@ public final class PhotoSyncEngine: PhotoSyncing {
             try Task.checkCancellation()
             let result = try await backup.findOrUpload(
                 resource: resource,
-                date: exported.takenAt,
-                token: item.clientToken,
-                localIdentifier: exported.localIdentifier,
+                identity: .init(
+                    date: exported.takenAt,
+                    token: item.clientToken,
+                    localIdentifier: exported.localIdentifier
+                ),
                 driveId: driveId,
                 folderId: destination,
                 candidates: candidates
             )
             verified.append(result)
         }
-        guard let (dto, hash) = verified.first, let metadata = exported.metadata,
+        guard let (dto, hash) = verified.first else { throw BackupSafetyError.incomplete }
+        let manifestResult = try await uploadManifest(
+            exported: exported,
+            verified: verified,
+            driveId: driveId,
+            destination: destination,
+            token: item.clientToken,
+            backup: backup
+        )
+        var snapshot = Self.makeSnapshot(
+            from: dto,
+            exported: exported,
+            driveId: driveId
+        )
+        snapshot.libraryRootId = folderId
+        snapshot.contentSHA256 = hash
+        snapshot.resourceFileIds = verified.map(\.0.id) + [manifestResult.0.id]
+        snapshot.backupComplete = true
+        snapshot.localModifiedAt = asset.modificationDate
+        snapshot.resourceRevisions = Dictionary(
+            (verified + [manifestResult]).map { ($0.0.id, $0.0.revision) },
+            uniquingKeysWith: { _, last in last }
+        )
+        try await photoWriter.upsert(snapshot)
+        return snapshot
+    }
+
+    // MARK: - Manifest verification
+
+    private func uploadManifest(
+        exported: ExportedAsset,
+        verified: [(RemoteFileDTO, String)],
+        driveId: Int,
+        destination: String,
+        token: String,
+        backup: ResourceBackup
+    ) async throws -> (RemoteFileDTO, String) {
+        let manifestURL = exported.fileURL.deletingLastPathComponent().appendingPathComponent(exported.fileName + ".kphotos.json")
+        guard let metadata = exported.metadata,
               var manifest = try JSONSerialization.jsonObject(with: metadata) as? [String: Any] else {
             throw BackupSafetyError.incomplete
         }
@@ -359,209 +388,38 @@ public final class PhotoSyncEngine: PhotoSyncing {
             resourceType: -1,
             originalFilename: manifestURL.lastPathComponent
         )
-        let manifestResult = try await backup.findOrUpload(
+        return try await backup.findOrUpload(
             resource: sidecar,
-            date: exported.takenAt,
-            token: item.clientToken,
-            localIdentifier: exported.localIdentifier,
+            identity: .init(
+                date: exported.takenAt,
+                token: token,
+                localIdentifier: exported.localIdentifier
+            ),
             driveId: driveId,
             folderId: destination,
             candidates: []
         )
-        var snapshot = Self.makeSnapshot(from: dto, exported: exported, driveId: driveId)
-        snapshot.libraryRootId = folderId
-        snapshot.contentSHA256 = hash
-        snapshot.resourceFileIds = verified.map(\.0.id) + [manifestResult.0.id]
-        snapshot.backupComplete = true
-        snapshot.localModifiedAt = asset.modificationDate
-        snapshot.resourceRevisions = Dictionary(
-            (verified + [manifestResult]).map { ($0.0.id, $0.0.revision) },
-            uniquingKeysWith: { _, last in last }
-        )
-        try await photoWriter.upsert(snapshot)
-        return snapshot
     }
 
-    // MARK: - Mappings
+    private func validateNetworkPolicy() throws {
+        let snapshot = try settings.current()
 
-    /// Construit un snapshot pour un asset local fraîchement uploadé.
-    /// Règle §6 critique : `takenAt` vient de PHAsset, jamais du serveur.
-    static func makeSnapshot(from dto: RemoteFileDTO, exported: ExportedAsset, driveId: Int) -> PhotoSnapshot {
-        var snapshot = PhotoSnapshot(
-            id: dto.id,
-            driveId: driveId,
-            localIdentifier: exported.localIdentifier,
-            name: dto.name,
-            takenAt: exported.takenAt,
-            uploadedAt: Date(timeIntervalSince1970: TimeInterval(dto.createdAt)),
-            mimeType: dto.mimeType,
-            size: dto.size,
-            isVideo: exported.isVideo,
-            duration: 0,
-            albumIds: [],
-            syncStatus: .synced,
-            isFavorite: false
-        )
-        snapshot.remoteRevision = dto.revision
-        snapshot.captureDateSource = "photokit"
-        snapshot.coordinate = exported.coordinate
-        snapshot.locationSource = exported.coordinate == nil ? "" : "photokit"
-        return snapshot
-    }
-
-    /// Construit un snapshot pour un fichier découvert en listant kDrive (pas de PHAsset local).
-    /// `takenAt` utilise la chaîne de fallback `created_at → last_modified_at → added_at`
-    /// pour éviter la date 1970 sur les fichiers uploadés depuis le web sans EXIF
-    /// (cf. doc OpenAPI : `created_at` n'est rempli que si extractible des metadata).
-    /// `uploadedAt` privilégie `added_at` (date d'upload immuable) plutôt que
-    /// `last_modified_at` qui change à chaque modif du fichier.
-    static func makeSnapshot(from dto: RemoteFileDTO, driveId: Int) -> PhotoSnapshot {
-        let takenTimestamp = dto.bestTakenAt
-        let uploadedTimestamp = dto.addedAt > 0 ? dto.addedAt : dto.lastModifiedAt
-        var snapshot = PhotoSnapshot(
-            id: dto.id,
-            driveId: driveId,
-            localIdentifier: "",
-            name: dto.name,
-            takenAt: Date(timeIntervalSince1970: TimeInterval(takenTimestamp)),
-            uploadedAt: Date(timeIntervalSince1970: TimeInterval(uploadedTimestamp)),
-            mimeType: dto.mimeType,
-            size: dto.size,
-            isVideo: dto.isVideoMedia,
-            duration: 0,
-            albumIds: [],
-            syncStatus: .synced,
-            isFavorite: false
-        )
-        snapshot.remoteRevision = dto.revision
-        snapshot.captureDateSource = "kdrive"
-        return snapshot
-    }
-}
-
-// MARK: - Retry classifier
-
-/// Décide si une erreur d'upload doit être retentée automatiquement (transient)
-/// ou présentée à l'utilisateur (permanent). Calcule aussi le backoff exponentiel
-/// par attempt count.
-///
-/// Le plafond `maxTransientAttempts` : au-delà, le classifier escalade en
-/// `.permanent` même pour une erreur normalement transient — sinon une photo
-/// qui rate indéfiniment (iCloud cassé en permanence, etc.) tournerait en boucle
-/// dans la file sans jamais alerter l'utilisateur.
-public enum BackupRetryDecision: Equatable {
-    case transient(retryAfter: TimeInterval)
-    case permanent
-}
-
-public enum BackupRetryClassifier {
-    /// Plafond de retries transients avant escalade en `.failedPermanent`.
-    /// Avec le schedule de backoff ci-dessous, 8 essais couvrent ~3 jours
-    /// d'attente cumulée — au-delà l'utilisateur mérite d'être notifié plutôt
-    /// que de laisser un item tourner silencieusement à l'infini.
-    public static let maxTransientAttempts = 8
-
-    public static func classify(error: Error, attemptCount: Int) -> BackupRetryDecision {
-        // Escalade : au-delà du plafond, toute erreur transient devient permanent.
-        guard attemptCount <= maxTransientAttempts else { return .permanent }
-
-        if let safety = error as? BackupSafetyError {
-            switch safety {
-            case .incomplete, .integrity, .tooLarge: return .permanent
-            case .busy: return .transient(retryAfter: 30)
-            }
+        // Validation aux frontières (§Fail fast AGENTS.md).
+        guard reachability.allowsSync(under: snapshot.networkPolicy) else {
+            throw SyncPolicyError.networkNotAllowed(
+                current: reachability.currentKind(),
+                policy: snapshot.networkPolicy
+            )
         }
-        if let exportError = error as? ExportError {
-            switch exportError {
-            case .missingCreationDate, .noResource:
-                // Problème structurel : pas de date EXIF, pas de ressource photo
-                // exploitable (Live Photo cassée, RAW non supporté…). Retentent
-                // ne changerait rien — c'est `.permanent` immédiat.
-                return .permanent
-            case .writeFailed:
-                // `PHAssetResourceManager.writeData` a échoué — typiquement iCloud
-                // Photos qui n'arrive pas à récupérer l'original (réseau, quota,
-                // serveur Apple temporairement indispo). Long backoff car le
-                // download iCloud peut prendre du temps avant de redevenir possible.
-                return .transient(retryAfter: backoff(forAttempt: attemptCount, base: 60))
-            }
+    }
+
+    private func cleanupExport(_ exported: ExportedAsset, manifestURL: URL) {
+        for url in [exported.fileURL, manifestURL] + exported.additionalResources.map(\.fileURL) {
+            try? fileManager.removeItem(at: url) // Files owned by this temporary export only.
         }
-        if let apiError = error as? PhotoAPIError {
-            switch apiError {
-            case .network, .rateLimited, .server(statusCode: 500 ..< 600, _):
-                // Réseau / 429 / 5xx — backoff agressif. `performWithRetry` côté
-                // fetcher en aura déjà mangé 3 ; à ce stade c'est qu'on a un
-                // vrai problème persistant à court terme.
-                return .transient(retryAfter: backoff(forAttempt: attemptCount, base: 30))
-            case .unauthorized:
-                // 401/403 → token révoqué ou perdu. Action utilisateur requise
-                // (re-login). Pas de retry auto qui ne ferait que cogner l'API.
-                return .permanent
-            case .notFound, .decoding, .invalidResponse:
-                return .permanent
-            case .server:
-                // 4xx hors 401/404/429 (typiquement 400 = mauvaise requête, 409,
-                // 413 = trop gros…) — rejouer ne changera pas le résultat.
-                return .permanent
-            }
+        let directory = exported.fileURL.deletingLastPathComponent()
+        if directory.deletingLastPathComponent().lastPathComponent == "kPhotosExports" {
+            try? fileManager.removeItem(at: directory)
         }
-        // Erreur Swift native / inconnue — soyons conservateurs, on retente une fois
-        // avant d'escalader. Si le bug est reproductible, l'escalade au plafond
-        // finit par exposer la cause à l'utilisateur.
-        return .transient(retryAfter: backoff(forAttempt: attemptCount, base: 30))
-    }
-
-    /// Backoff exponentiel borné à 24h.
-    /// Schedule pour base=30s : 30s, 1min, 2min, 4min, 8min, 16min, 32min, 64min.
-    /// Schedule pour base=60s (iCloud) : 1min, 2min, 4min, 8min, 16min, 32min, 64min, 128min.
-    public static func backoff(forAttempt attempt: Int, base: TimeInterval) -> TimeInterval {
-        let exponent = max(0, attempt - 1) // 1ère tentative ratée → 30s, pas 60s
-        let raw = base * pow(2, Double(exponent))
-        return min(raw, 24 * 3600)
-    }
-}
-
-/// Finish the selected library, including a folder changed during a previous read.
-/// Older scopes can remain cached, but must never become the visible result.
-public struct CloudLibraryRefresh {
-    private let drives: DriveManaging
-    private let settings: SyncSettingsReading
-    private let sync: PhotoSyncing
-    private let photos: PhotoReading
-
-    public init(drives: DriveManaging, settings: SyncSettingsReading, sync: PhotoSyncing, photos: PhotoReading) {
-        self.drives = drives
-        self.settings = settings
-        self.sync = sync
-        self.photos = photos
-    }
-
-    public func load() async throws -> [PhotoSnapshot] {
-        while let drive = try drives.selectedDrive() {
-            try Task.checkCancellation()
-            let name = try settings.current().rootFolderName
-            var root = drive.rootFolderId
-            do {
-                root = try await drives.existingRootFolder(folderName: name)
-                try await sync.refreshFolder(driveId: drive.id, folderId: root)
-                try Task.checkCancellation()
-                guard try stillSelected(driveId: drive.id, root: root, name: name) else { continue }
-                return try photos.allPhotos().filter {
-                    $0.driveId == drive.id && $0.libraryRootId == root && $0.isAvailable
-                }
-            } catch {
-                try Task.checkCancellation()
-                // A failure for an obsolete folder must not prevent the newly selected one loading.
-                guard try stillSelected(driveId: drive.id, root: root, name: name) else { continue }
-                throw error
-            }
-        }
-        return []
-    }
-
-    private func stillSelected(driveId: Int, root: String, name: String) throws -> Bool {
-        guard let current = try drives.selectedDrive() else { return false }
-        let currentName = try settings.current().rootFolderName
-        return current.id == driveId && current.rootFolderId == root && currentName == name
     }
 }

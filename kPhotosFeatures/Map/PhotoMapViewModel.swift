@@ -99,7 +99,8 @@ public final class PhotoMapViewModel: ObservableObject {
                 let drive = try? driveManager.selectedDrive()
                 let scope = drive.map { "\($0.id):\($0.rootFolderId)" }
                 self.metadataProgress = progress.libraryScope == scope ? progress : MetadataIndexProgress()
-            }.store(in: &cancellables)
+            }
+            .store(in: &cancellables)
         photoReader.changesPublisher
             .throttle(for: .seconds(10), scheduler: DispatchQueue.main, latest: true)
             .sink { [weak self] in Task { await self?.load() } }
@@ -142,7 +143,8 @@ public final class PhotoMapViewModel: ObservableObject {
             return
         }
         // Cloud coordinates never require access to the iPhone photo library.
-        let identifiers = cloudPhotos.filter { $0.coordinate == nil && !$0.localIdentifier.isEmpty }.map(\.localIdentifier)
+        let identifiers = cloudPhotos.filter { $0.coordinate == nil && !$0.localIdentifier.isEmpty }
+            .map(\.localIdentifier)
         let locations = (auth == .authorized || auth == .limited)
             ? await assetReader.fetchLocations(forLocalIdentifiers: identifiers) : []
         guard generation == loadGeneration, !Task.isCancelled else { return }
@@ -269,11 +271,11 @@ public final class PhotoMapViewModel: ObservableObject {
         let earthRadiusKm = 6371.0
         let dLat = (lat2 - lat1) * .pi / 180
         let dLon = (lon2 - lon1) * .pi / 180
-        let a = sin(dLat / 2) * sin(dLat / 2)
+        let haversine = sin(dLat / 2) * sin(dLat / 2)
             + cos(lat1 * .pi / 180) * cos(lat2 * .pi / 180)
             * sin(dLon / 2) * sin(dLon / 2)
-        let c = 2 * atan2(sqrt(a), sqrt(1 - a))
-        return earthRadiusKm * c
+        let arc = 2 * atan2(sqrt(haversine), sqrt(1 - haversine))
+        return earthRadiusKm * arc
     }
 
     /// Résout `placeName` pour chaque groupe en séquentiel — CLGeocoder est rate-

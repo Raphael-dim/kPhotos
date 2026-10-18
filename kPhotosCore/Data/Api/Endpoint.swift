@@ -22,7 +22,13 @@ public struct Endpoint {
     /// Host kDrive — tous les endpoints `/2/drive/...` et `/3/drive/...` y vivent.
     /// Cf. github.com/Infomaniak/ios-kDrive `apiDriveHost`. L'ancien `api.infomaniak.com`
     /// est l'API générale Infomaniak (mail, sms, etc.), pas kDrive.
-    public static let baseURL = URL(string: "https://api.kdrive.infomaniak.com")!
+    public static let baseURL: URL = {
+        guard let url = URL(string: "https://api.kdrive.infomaniak.com") else {
+            preconditionFailure("Invalid built-in kDrive endpoint")
+        }
+        return url
+    }()
+
     /// Alias pour rétro-compat, identique à `baseURL`.
     public static let kDriveBaseURL = baseURL
 

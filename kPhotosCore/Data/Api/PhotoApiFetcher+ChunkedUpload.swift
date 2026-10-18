@@ -40,7 +40,10 @@ enum ChunkSessionStorage {
         return try JSONDecoder().decode(ChunkUploadSession.self, from: data)
     }
 
-    static func save(_ session: ChunkUploadSession, key: String) throws {
+    static func save(
+        _ session: ChunkUploadSession,
+        key: String
+    ) throws {
         let data = try JSONEncoder().encode(session)
         let status = SecItemUpdate(base(key) as CFDictionary, [kSecValueData as String: data] as CFDictionary)
         if status == errSecSuccess { return }
@@ -81,12 +84,13 @@ extension PhotoApiFetcher {
     func uploadChunked(
         driveId: Int,
         folderId: String,
-        fileURL: URL,
-        fileName: String,
+        source: UploadSource,
         createdAt: Date,
         totalSize: Int,
         clientToken: String
     ) async throws -> RemoteFileDTO {
+        let fileURL = source.fileURL
+
         guard totalSize <= 50_000_000_000 else { throw BackupSafetyError.tooLarge }
         guard let directoryId = Int(folderId) else { throw PhotoAPIError.invalidResponse }
         let key = MediaIntegrity.token("\(driveId):\(folderId):\(clientToken):\(totalSize)")
@@ -97,23 +101,14 @@ extension PhotoApiFetcher {
         }
         let chunks = (totalSize + Self.chunkSize - 1) / Self.chunkSize
         if stored == nil {
-            let response: ChunkSessionResponse = try await requestJSON(
-                endpoint: Endpoint(path: "/3/drive/\(driveId)/upload/session/start"),
-                method: .post,
-                parameters: [
-                    "directory_id": directoryId,
-                    "file_name": fileName,
-                    "total_size": totalSize,
-                    "total_chunks": chunks,
-                    "created_at": Int(createdAt.timeIntervalSince1970),
-                    "conflict": "error"
-                ]
+            stored = try await startChunkedUpload(
+                source: source,
+                driveId: driveId,
+                directoryId: directoryId,
+                createdAt: createdAt,
+                totalSize: totalSize,
+                key: key
             )
-            guard response.result, let token = response.token, let url = response.uploadURL,
-                  Self.trustedUploadHost(url) else { throw PhotoAPIError.invalidResponse }
-            let session = ChunkUploadSession(token: token, uploadURL: url, startedAt: Date(), nextChunk: 1)
-            try ChunkSessionStorage.save(session, key: key)
-            stored = session
         }
         guard var upload = stored, Self.trustedUploadHost(upload.uploadURL) else { throw PhotoAPIError.invalidResponse }
         let handle = try FileHandle(forReadingFrom: fileURL)
@@ -136,23 +131,12 @@ extension PhotoApiFetcher {
                     URLQueryItem(name: "chunk_hash", value: "sha256:" + digest)
                 ]
             )
-            try await performWithRetry {
-                try await self.waitForRequest()
-                let response = await self.session.upload(
-                    data,
-                    to: endpoint.url,
-                    method: .post,
-                    headers: ["Content-Type": "application/octet-stream"]
-                )
-                .validate().serializingData().response
-                try Task.checkCancellation()
-                if let error = response.error { throw Self.mapAFError(error, statusCode: response.response?.statusCode) }
-                guard let body = response.data,
-                      let envelope = try JSONSerialization.jsonObject(with: body) as? [String: Any],
-                      envelope["result"] as? String == "success" else { throw PhotoAPIError.invalidResponse }
-            }
+            try await sendChunk(data, to: endpoint)
             upload.nextChunk = number + 1
-            try ChunkSessionStorage.save(upload, key: key)
+            try ChunkSessionStorage.save(
+                upload,
+                key: key
+            )
         }
         let finished: ChunkSessionResponse = try await requestJSON(
             endpoint: Endpoint(path: "/3/drive/\(driveId)/upload/session/\(upload.token)/finish"),
@@ -162,5 +146,57 @@ extension PhotoApiFetcher {
         guard finished.result, let file = finished.file, file.size == totalSize else { throw BackupSafetyError.integrity }
         ChunkSessionStorage.remove(key)
         return file
+    }
+
+    private func startChunkedUpload(
+        source: UploadSource,
+        driveId: Int,
+        directoryId: Int,
+        createdAt: Date,
+        totalSize: Int,
+        key: String
+    ) async throws -> ChunkUploadSession {
+        let fileName = source.fileName
+        let chunks = (totalSize + Self.chunkSize - 1) / Self.chunkSize
+        let response: ChunkSessionResponse = try await requestJSON(
+            endpoint: Endpoint(path: "/3/drive/\(driveId)/upload/session/start"),
+            method: .post,
+            parameters: [
+                "directory_id": directoryId,
+                "file_name": fileName,
+                "total_size": totalSize,
+                "total_chunks": chunks,
+                "created_at": Int(createdAt.timeIntervalSince1970),
+                "conflict": "error"
+            ]
+        )
+        guard response.result, let token = response.token, let url = response.uploadURL,
+              Self.trustedUploadHost(url) else { throw PhotoAPIError.invalidResponse }
+        let session = ChunkUploadSession(token: token, uploadURL: url, startedAt: Date(), nextChunk: 1)
+        try ChunkSessionStorage.save(
+            session,
+            key: key
+        )
+        return session
+    }
+
+    private func sendChunk(_ data: Data, to endpoint: Endpoint) async throws {
+        try await performWithRetry {
+            try await self.waitForRequest()
+            let response = await self.session.upload(
+                data,
+                to: endpoint.url,
+                method: .post,
+                headers: ["Content-Type": "application/octet-stream"]
+            )
+            .validate()
+            .serializingData()
+            .response
+            try Task.checkCancellation()
+            if let error = response.error { throw Self.mapAFError(error, statusCode: response.response?.statusCode) }
+            guard let body = response.data,
+                  let envelope = try JSONSerialization.jsonObject(with: body) as? [String: Any],
+                  envelope["result"] as? String == "success" else { throw PhotoAPIError.invalidResponse }
+        }
     }
 }

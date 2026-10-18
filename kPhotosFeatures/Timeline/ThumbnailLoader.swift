@@ -58,8 +58,9 @@ final class ThumbnailLoader: ObservableObject {
 
     static func cacheKey(driveId: Int, fileId: String, revision: String) -> String {
         let legacy = "\(driveId)-\(fileId)"
-        return revision.isEmpty ? legacy : legacy + "-" + SHA256.hash(data: Data(revision.utf8))
-            .map { String(format: "%02x", $0) }.joined()
+        guard !revision.isEmpty else { return legacy }
+        let digest = SHA256.hash(data: Data(revision.utf8)).map { String(format: "%02x", $0) }.joined()
+        return legacy + "-" + digest
     }
 
     static func mapImage(for photo: PhotoSnapshot) async -> UIImage? {
@@ -91,39 +92,44 @@ final class ThumbnailLoader: ObservableObject {
 
         isLoading = true
         defer { isLoading = false }
-        if let disk = await ThumbnailCache.shared.diskImageAsync(forKey: cacheKey) {
-            ThumbnailCache.shared.store(disk, forKey: cacheKey)
-            if !Task.isCancelled { image = disk }
-            return
-        }
+        if await loadDiskImage(cacheKey: cacheKey) { return }
 
         if let until = Self.failedUntil[cacheKey], until > Date() { return }
         // Scrolling past an uncached tile must not consume a scarce API request.
         do { try await Task.sleep(nanoseconds: 180_000_000) } catch { return }
         guard !Task.isCancelled else { return }
 
-        if let pack {
-            do {
-                if let bytes = try await packs.imageData(driveId: driveId, reference: pack, fileId: fileId, revision: revision),
-                   let decoded = await ThumbnailImageDecoder.decode(bytes) {
-                    ThumbnailCache.shared.store(decoded, forKey: cacheKey)
-                    if !Task.isCancelled { image = decoded }
-                    return
-                }
-            } catch {
-                if Task.isCancelled { return }
-                // A missing/corrupt derivative cache must not prevent the ordinary server thumbnail fallback.
-            }
+        if await loadPackedImage(cacheKey: cacheKey) { return }
+        guard !Task.isCancelled else { return }
+
+        if await loadSavedPreview(cacheKey: cacheKey) { return }
+        guard !Task.isCancelled else { return }
+        await loadRemoteImage(cacheKey: cacheKey, priority: priority)
+    }
+
+    private func loadDiskImage(cacheKey: String) async -> Bool {
+        if let disk = await ThumbnailCache.shared.diskImageAsync(forKey: cacheKey) {
+            ThumbnailCache.shared.store(disk, forKey: cacheKey)
+            if !Task.isCancelled { image = disk }
+            return true
         }
 
+        return false
+    }
+
+    private func loadSavedPreview(cacheKey: String) async -> Bool {
         // Reuse a previously opened original when the server has no generated preview.
         var savedPreview = PreviewCache.shared.image(forKey: cacheKey)
         if savedPreview == nil { savedPreview = await PreviewCache.shared.diskImageAsync(forKey: cacheKey) }
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled else { return false }
         if let preview = savedPreview {
             await cache(preview, key: cacheKey)
-            return
+            return true
         }
+        return false
+    }
+
+    private func loadRemoteImage(cacheKey: String, priority: Int) async {
         do {
             do {
                 let data = try await thumbnails.data(driveId: driveId, fileId: fileId, revision: revision, priority: priority)
@@ -141,24 +147,7 @@ final class ThumbnailLoader: ObservableObject {
             } catch {
                 guard Self.canTryOriginal(after: error), !Task.isCancelled else { throw error }
             }
-            // Never download a large video or RAW just to draw a gallery tile.
-            let info = try await api.fileInfo(driveId: driveId, fileId: fileId)
-            let isImageName = ["heic", "heif", "jpg", "jpeg", "png", "webp", "tif", "tiff"]
-                .contains((info.name as NSString).pathExtension.lowercased())
-            guard info.mimeType.hasPrefix("image/") ||
-                ((info.mimeType.isEmpty || info.mimeType == "application/octet-stream") && isImageName),
-                info.size > 0, info.size <= 20_000_000 else {
-                throw PhotoAPIError.invalidResponse
-            }
-            let url = try await api.downloadFile(driveId: driveId, fileId: fileId)
-            defer { try? FileManager.default.removeItem(at: url) } // Owned temporary download only.
-            let decoded = await Task.detached(priority: .userInitiated) {
-                guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-                      let cg = ThumbnailImageDecoder.image(source: source) else { return UIImage?.none }
-                return UIImage(cgImage: cg)
-            }.value
-            guard let decoded else { throw PhotoAPIError.invalidResponse }
-            await cache(decoded, key: cacheKey)
+            try await downloadAndCacheOriginalImage(cacheKey: cacheKey)
         } catch {
             // The neutral placeholder remains retryable. Do not hammer missing/unsupported previews.
             if Self.canTryOriginal(after: error), !Task.isCancelled {
@@ -166,6 +155,45 @@ final class ThumbnailLoader: ObservableObject {
             }
         }
         if Self.failedUntil.count > 1000 { Self.failedUntil = Self.failedUntil.filter { $0.value > Date() } }
+    }
+
+    private func loadPackedImage(cacheKey: String) async -> Bool {
+        if let pack {
+            do {
+                if let bytes = try await packs.imageData(driveId: driveId, reference: pack, fileId: fileId, revision: revision),
+                   let decoded = await ThumbnailImageDecoder.decode(bytes) {
+                    ThumbnailCache.shared.store(decoded, forKey: cacheKey)
+                    if !Task.isCancelled { image = decoded }
+                    return true
+                }
+            } catch {
+                if Task.isCancelled { return false }
+                // A missing/corrupt derivative cache must not prevent the ordinary server thumbnail fallback.
+            }
+        }
+
+        return false
+    }
+
+    private func downloadAndCacheOriginalImage(cacheKey: String) async throws {
+        // Never download a large video or RAW just to draw a gallery tile.
+        let info = try await api.fileInfo(driveId: driveId, fileId: fileId)
+        let isImageName = ["heic", "heif", "jpg", "jpeg", "png", "webp", "tif", "tiff"]
+            .contains((info.name as NSString).pathExtension.lowercased())
+        guard info.mimeType.hasPrefix("image/") ||
+            ((info.mimeType.isEmpty || info.mimeType == "application/octet-stream") && isImageName),
+            info.size > 0, info.size <= 20_000_000 else {
+            throw PhotoAPIError.invalidResponse
+        }
+        let url = try await api.downloadFile(driveId: driveId, fileId: fileId)
+        defer { try? FileManager.default.removeItem(at: url) } // Owned temporary download only.
+        let decoded = await Task.detached(priority: .userInitiated) {
+            guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+                  let cg = ThumbnailImageDecoder.image(source: source) else { return UIImage?.none }
+            return UIImage(cgImage: cg)
+        }.value
+        guard let decoded else { throw PhotoAPIError.invalidResponse }
+        await cache(decoded, key: cacheKey)
     }
 
     static func canTryOriginal(after error: Error) -> Bool {

@@ -38,7 +38,8 @@ public extension PhotoApiFetcher {
         let candidates = try await children(folder.id).filter {
             !$0.isDirectory && $0.status == "ok" && $0.name.hasPrefix("index-") && $0.name.hasSuffix(".json")
                 && $0.size > 0 && $0.size <= 32 * 1024 * 1024
-        }.sorted { $0.lastModifiedAt == $1.lastModifiedAt ? $0.name > $1.name : $0.lastModifiedAt > $1.lastModifiedAt }
+        }
+        .sorted { $0.lastModifiedAt == $1.lastModifiedAt ? $0.name > $1.name : $0.lastModifiedAt > $1.lastModifiedAt }
         guard let file = candidates.first else { return nil }
         let url = try await signedOriginalURL(driveId: driveId, fileId: file.id, priority: 0)
         let data = try await BoundedMediaRead(maximum: 32 * 1024 * 1024).read(url: url)

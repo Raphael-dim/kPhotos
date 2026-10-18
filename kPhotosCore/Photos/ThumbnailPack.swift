@@ -66,7 +66,19 @@ public enum ThumbnailPack {
         return Data(bytes: blob, count: size)
     }
 
-    public static func create(at url: URL, images: [(String, String, Data)]) throws {
+    public struct Image: Sendable {
+        public let fileId: String
+        public let revision: String
+        public let data: Data
+
+        public init(fileId: String, revision: String, data: Data) {
+            self.fileId = fileId
+            self.revision = revision
+            self.data = data
+        }
+    }
+
+    public static func create(at url: URL, images: [Image]) throws {
         guard !FileManager.default.fileExists(atPath: url.path) else { throw PhotoAPIError.invalidResponse }
         var db: OpaquePointer?
         guard sqlite3_open_v2(url.path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nil) ==
@@ -82,10 +94,15 @@ public enum ThumbnailPack {
             nil
         ) == SQLITE_OK else { throw PhotoAPIError.invalidResponse }
         var stmt: OpaquePointer?
-        guard sqlite3_prepare_v2(db, "INSERT INTO thumbnails VALUES(?,?,?)", -1, &stmt, nil) == SQLITE_OK else { throw PhotoAPIError.invalidResponse }
+        guard sqlite3_prepare_v2(db, "INSERT INTO thumbnails VALUES(?,?,?)", -1, &stmt, nil) == SQLITE_OK else {
+            throw PhotoAPIError.invalidResponse
+        }
         defer { sqlite3_finalize(stmt) }
         let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
-        for (id, revision, jpeg) in images {
+        for image in images {
+            let id = image.fileId
+            let revision = image.revision
+            let jpeg = image.data
             guard !jpeg.isEmpty, jpeg.count <= 1024 * 1024 else { throw PhotoAPIError.invalidResponse }
             sqlite3_reset(stmt); sqlite3_clear_bindings(stmt)
             sqlite3_bind_text(stmt, 1, id, -1, transient); sqlite3_bind_text(stmt, 2, revision, -1, transient)

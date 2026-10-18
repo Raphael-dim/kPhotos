@@ -232,8 +232,9 @@ private final class MediaPageLoader: ObservableObject {
                 livePlayer = AVPlayer(playerItem: AVPlayerItem(asset: source.asset))
             case .local(let asset):
                 let fetch = PHAsset.fetchAssets(withLocalIdentifiers: [asset.localIdentifier], options: nil)
-                guard let phAsset = fetch.firstObject,
-                      let resource = PHAssetResource.assetResources(for: phAsset).first(where: { $0.type == .pairedVideo }) else { return false }
+                guard let phAsset = fetch.firstObject else { return false }
+                let resources = PHAssetResource.assetResources(for: phAsset)
+                guard let resource = resources.first(where: { $0.type == .pairedVideo }) else { return false }
                 let url = FileManager.default.temporaryDirectory
                     .appendingPathComponent(UUID().uuidString).appendingPathExtension("mov")
                 let options = PHAssetResourceRequestOptions()
@@ -280,31 +281,9 @@ private final class MediaPageLoader: ObservableObject {
 
     private func loadCloud(_ photo: PhotoSnapshot) async {
         hasLiveMotion = photo.liveMotionFileId != nil
-        if !photo.localIdentifier.isEmpty,
-           let local = PHAsset.fetchAssets(withLocalIdentifiers: [photo.localIdentifier], options: nil).firstObject {
-            if photo.isVideo, let item = await Self.requestPlayerItem(for: local) {
-                player = AVPlayer(playerItem: item); errorMessage = nil; return
-            }
-            if !photo.isVideo, let original = await Self.requestImage(for: local) {
-                image = original; didLoadPreview = true; errorMessage = nil; return
-            }
-        }
+        if await loadLinkedLocal(photo) { return }
         if photo.isVideo {
-            if player != nil { return }
-            do {
-                isLoadingPreview = true
-                defer { isLoadingPreview = false }
-                let url = try await api.playbackURL(driveId: photo.driveId, fileId: photo.fileId)
-                let source = try RemoteMediaAsset(url: url, maximumBytes: nil)
-                remoteVideo = source
-                guard try await source.asset.load(.isPlayable) else { throw PhotoAPIError.invalidResponse }
-                try Task.checkCancellation()
-                player = AVPlayer(playerItem: AVPlayerItem(asset: source.asset))
-                errorMessage = nil
-            } catch {
-                if error is CancellationError || Task.isCancelled { return }
-                errorMessage = error.localizedDescription
-            }
+            await loadCloudVideo(photo)
             return
         }
 
@@ -361,6 +340,37 @@ private final class MediaPageLoader: ObservableObject {
             } catch {
                 errorMessage = error.localizedDescription
             }
+        }
+    }
+
+    private func loadLinkedLocal(_ photo: PhotoSnapshot) async -> Bool {
+        if !photo.localIdentifier.isEmpty,
+           let local = PHAsset.fetchAssets(withLocalIdentifiers: [photo.localIdentifier], options: nil).firstObject {
+            if photo.isVideo, let item = await Self.requestPlayerItem(for: local) {
+                player = AVPlayer(playerItem: item); errorMessage = nil; return true
+            }
+            if !photo.isVideo, let original = await Self.requestImage(for: local) {
+                image = original; didLoadPreview = true; errorMessage = nil; return true
+            }
+        }
+        return false
+    }
+
+    private func loadCloudVideo(_ photo: PhotoSnapshot) async {
+        if player != nil { return }
+        do {
+            isLoadingPreview = true
+            defer { isLoadingPreview = false }
+            let url = try await api.playbackURL(driveId: photo.driveId, fileId: photo.fileId)
+            let source = try RemoteMediaAsset(url: url, maximumBytes: nil)
+            remoteVideo = source
+            guard try await source.asset.load(.isPlayable) else { throw PhotoAPIError.invalidResponse }
+            try Task.checkCancellation()
+            player = AVPlayer(playerItem: AVPlayerItem(asset: source.asset))
+            errorMessage = nil
+        } catch {
+            if error is CancellationError || Task.isCancelled { return }
+            errorMessage = error.localizedDescription
         }
     }
 

@@ -58,16 +58,16 @@ public final class DriveManagerImpl: DriveManaging {
         try await realm.write { realm in
             // Préserver l'état "isSelected" et "rootFolderId" lors du refresh.
             let existing = realm.objects(Drive.self)
-            var existingMap: [Int: (Bool, String, String)] = [:]
+            var existingMap: [Int: DriveSnapshot] = [:]
             for drive in existing {
-                existingMap[drive.id] = (drive.isSelected, drive.rootFolderId, drive.privateSpaceId)
+                existingMap[drive.id] = DriveSnapshot(drive)
             }
             let mapped = remote.map { Self.makeDrive(from: $0) }
             for drive in mapped {
-                if let (selected, rootId, privateId) = existingMap[drive.id] {
-                    drive.privateSpaceId = privateId
-                    drive.isSelected = selected
-                    drive.rootFolderId = rootId
+                if let existing = existingMap[drive.id] {
+                    drive.privateSpaceId = existing.privateSpaceId
+                    drive.isSelected = existing.isSelected
+                    drive.rootFolderId = existing.rootFolderId
                 }
             }
             realm.add(mapped, update: .modified)

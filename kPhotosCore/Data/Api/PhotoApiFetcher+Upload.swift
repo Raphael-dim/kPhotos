@@ -19,6 +19,18 @@
 import Alamofire
 import Foundation
 
+public struct UploadSource: Sendable {
+    public let fileURL: URL
+    public let fileName: String
+    public let mimeType: String
+
+    public init(fileURL: URL, fileName: String, mimeType: String) {
+        self.fileURL = fileURL
+        self.fileName = fileName
+        self.mimeType = mimeType
+    }
+}
+
 public extension PhotoApiFetcher {
     /// Upload simple (≤ 50 MB), puis upload par blocs au-delà.
     /// **Format requis par l'API** (cf. docs/api/infomaniak_openapi.json — `/3/drive/{drive_id}/upload`) :
@@ -35,12 +47,14 @@ public extension PhotoApiFetcher {
     func upload(
         driveId: Int,
         folderId: String,
-        fileURL: URL,
-        fileName: String,
+        source: UploadSource,
         createdAt: Date,
-        mimeType: String,
         clientToken: String
     ) async throws -> RemoteFileDTO {
+        let fileURL = source.fileURL
+        let fileName = source.fileName
+        let mimeType = source.mimeType
+
         let createdAtUnix = Int(createdAt.timeIntervalSince1970)
         let totalSize = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int) ?? 0
 
@@ -48,8 +62,7 @@ public extension PhotoApiFetcher {
             return try await uploadChunked(
                 driveId: driveId,
                 folderId: folderId,
-                fileURL: fileURL,
-                fileName: fileName,
+                source: .init(fileURL: fileURL, fileName: fileName, mimeType: mimeType),
                 createdAt: createdAt,
                 totalSize: totalSize,
                 clientToken: clientToken
@@ -60,11 +73,9 @@ public extension PhotoApiFetcher {
             return try await performUpload(
                 driveId: driveId,
                 folderId: folderId,
-                fileURL: fileURL,
-                fileName: fileName,
+                source: .init(fileURL: fileURL, fileName: fileName, mimeType: mimeType),
                 createdAtUnix: createdAtUnix,
                 totalSize: totalSize,
-                mimeType: mimeType,
                 clientToken: clientToken
             )
         }
@@ -73,13 +84,15 @@ public extension PhotoApiFetcher {
     private func performUpload(
         driveId: Int,
         folderId: String,
-        fileURL: URL,
-        fileName: String,
+        source: UploadSource,
         createdAtUnix: Int,
         totalSize: Int,
-        mimeType: String,
         clientToken: String
     ) async throws -> RemoteFileDTO {
+        let fileURL = source.fileURL
+        let fileName = source.fileName
+        let mimeType = source.mimeType
+
         let endpoint = Endpoint.upload(
             driveId: driveId,
             directoryId: folderId,

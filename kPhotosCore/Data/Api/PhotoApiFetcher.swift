@@ -44,10 +44,8 @@ public protocol PhotoApiFetching: AnyObject {
     func upload(
         driveId: Int,
         folderId: String,
-        fileURL: URL,
-        fileName: String,
+        source: UploadSource,
         createdAt: Date,
-        mimeType: String,
         clientToken: String
     ) async throws -> RemoteFileDTO
     func createDirectory(driveId: Int, name: String, parentId: String) async throws -> RemoteDirectoryDTO

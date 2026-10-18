@@ -160,8 +160,13 @@ public final class AlbumManagerImpl: AlbumManaging {
             cursor = page.nextCursor
         } while cursor != nil
 
-        try await realm.write {
-            realm in
+        try await commitAlbumPhotos(albumId: albumId, orderedFileIds: orderedFileIds, serverFileIds: serverFileIds)
+    }
+
+    private func commitAlbumPhotos(
+        albumId: String, orderedFileIds: [String], serverFileIds: Set<String>
+    ) async throws {
+        try await realm.write { realm in
             // Ajoute la référence pour chaque photo locale présente côté serveur.
             for fileId in serverFileIds {
                 guard let photo = realm.object(ofType: Photo.self, forPrimaryKey: fileId) else { continue }

@@ -48,13 +48,20 @@ public struct AuthConfig: Equatable {
     ///
     /// The OAuth flow is **inactive** in the current build (PAT is used
     /// instead), so a placeholder is acceptable here.
-    public static let infomaniak = AuthConfig(
-        clientId: "REPLACE_WITH_YOUR_INFOMANIAK_OAUTH_CLIENT_ID",
-        redirectURI: URL(string: "app.kphotos://oauth/callback")!,
-        callbackScheme: "app.kphotos",
-        authorizationEndpoint: URL(string: "https://login.infomaniak.com/authorize")!,
-        tokenEndpoint: URL(string: "https://login.infomaniak.com/token")!
-    )
+    public static let infomaniak: AuthConfig = {
+        guard let redirect = URL(string: "app.kphotos://oauth/callback"),
+              let authorization = URL(string: "https://login.infomaniak.com/authorize"),
+              let token = URL(string: "https://login.infomaniak.com/token") else {
+            preconditionFailure("Invalid built-in OAuth endpoints")
+        }
+        return AuthConfig(
+            clientId: "REPLACE_WITH_YOUR_INFOMANIAK_OAUTH_CLIENT_ID",
+            redirectURI: redirect,
+            callbackScheme: "app.kphotos",
+            authorizationEndpoint: authorization,
+            tokenEndpoint: token
+        )
+    }()
 
     public var isConfigured: Bool {
         !clientId.hasPrefix("REPLACE_") && !clientId.isEmpty

@@ -170,11 +170,11 @@ final class MediaLibraryIndexTests: XCTestCase {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
         defer { try? FileManager.default.removeItem(at: url) }
         let bytes = Data([1, 2, 3])
-        try ThumbnailPack.create(at: url, images: [("id", "rev", bytes)])
+        try ThumbnailPack.create(at: url, images: [.init(fileId: "id", revision: "rev", data: bytes)])
         XCTAssertEqual(try ThumbnailPack.imageData(at: url, fileId: "id", revision: "rev"), bytes)
         XCTAssertNil(try ThumbnailPack.imageData(at: url, fileId: "id", revision: "new"))
         let original = try Data(contentsOf: url)
-        XCTAssertThrowsError(try ThumbnailPack.create(at: url, images: [("id", "new", Data([4]))]))
+        XCTAssertThrowsError(try ThumbnailPack.create(at: url, images: [.init(fileId: "id", revision: "new", data: Data([4]))]))
         XCTAssertEqual(try Data(contentsOf: url), original)
         try Data("corrupt".utf8).write(to: url)
         XCTAssertThrowsError(try ThumbnailPack.imageData(at: url, fileId: "id", revision: "rev"))

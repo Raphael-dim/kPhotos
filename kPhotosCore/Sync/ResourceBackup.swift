@@ -57,15 +57,23 @@ final class ResourceBackup {
         return parent
     }
 
+    struct Identity {
+        let date: Date
+        let token: String
+        let localIdentifier: String
+    }
+
     func findOrUpload(
         resource: ExportedResource,
-        date: Date,
-        token: String,
-        localIdentifier: String,
+        identity: Identity,
         driveId: Int,
         folderId: String,
         candidates: [PhotoSnapshot]
     ) async throws -> (RemoteFileDTO, String) {
+        let date = identity.date
+        let token = identity.token
+        let localIdentifier = identity.localIdentifier
+
         let size = try FileManager.default.attributesOfItem(atPath: resource.fileURL.path)[.size] as? Int64 ?? 0
         let hash = try MediaIntegrity.sha256(file: resource.fileURL)
         let reusable = candidates.filter {
@@ -104,10 +112,8 @@ final class ResourceBackup {
         let dto = try await api.upload(
             driveId: driveId,
             folderId: folderId,
-            fileURL: resource.fileURL,
-            fileName: resource.fileName,
+            source: .init(fileURL: resource.fileURL, fileName: resource.fileName, mimeType: resource.mimeType),
             createdAt: date,
-            mimeType: resource.mimeType,
             clientToken: MediaIntegrity
                 .token("\(driveId):\(folderId):" + token + ":" + hash + ":" + resource.fileName)
         )

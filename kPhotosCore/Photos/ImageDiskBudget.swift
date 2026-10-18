@@ -40,7 +40,7 @@ public enum ImageDiskBudget {
             if let free, free - Int64(data.count) < 128 * 1024 * 1024 { return }
             try? data.write(to: url, options: .atomic)
             writes += 1
-            if writes % 32 == 0 || Date().timeIntervalSince(lastTrim[directory] ?? .distantPast) > 30 {
+            if writes.isMultiple(of: 32) || Date().timeIntervalSince(lastTrim[directory] ?? .distantPast) > 30 {
                 trim(directory: directory, limit: limit)
                 lastTrim[directory] = Date()
             }
@@ -51,6 +51,12 @@ public enum ImageDiskBudget {
         await withCheckedContinuation { continuation in queue.async { continuation.resume() } }
     }
 
+    private struct Entry {
+        let url: URL
+        let size: Int
+        let modified: Date
+    }
+
     public static func trim(directory: URL, limit: Int) {
         let keys: Set<URLResourceKey> = [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey]
         guard let files = try? FileManager.default.contentsOfDirectory(
@@ -58,13 +64,14 @@ public enum ImageDiskBudget {
             includingPropertiesForKeys: Array(keys),
             options: [.skipsHiddenFiles]
         ) else { return }
-        let entries = files.compactMap { url -> (URL, Int, Date)? in
+        let entries = files.compactMap { url -> Entry? in
             guard let info = try? url.resourceValues(forKeys: keys), info.isRegularFile == true else { return nil }
-            return (url, info.fileSize ?? 0, info.contentModificationDate ?? .distantPast)
-        }.sorted { $0.2 < $1.2 }
-        var total = entries.reduce(0) { $0 + $1.1 }
-        for (url, size, _) in entries where total > limit {
-            do { try FileManager.default.removeItem(at: url); total -= size } catch { continue }
+            return Entry(url: url, size: info.fileSize ?? 0, modified: info.contentModificationDate ?? .distantPast)
+        }
+        .sorted { $0.modified < $1.modified }
+        var total = entries.reduce(0) { $0 + $1.size }
+        for entry in entries where total > limit {
+            do { try FileManager.default.removeItem(at: entry.url); total -= entry.size } catch { continue }
         }
     }
 }

@@ -275,10 +275,8 @@ private final class FakeDeletionApi: PhotoApiFetching {
     func upload(
         driveId: Int,
         folderId: String,
-        fileURL: URL,
-        fileName: String,
+        source: UploadSource,
         createdAt: Date,
-        mimeType: String,
         clientToken: String
     ) async throws -> RemoteFileDTO {
         throw PhotoAPIError.invalidResponse

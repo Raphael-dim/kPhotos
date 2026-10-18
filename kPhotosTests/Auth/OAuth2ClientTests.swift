@@ -25,14 +25,14 @@ final class OAuth2ClientTests: XCTestCase {
     private let client = OAuth2Client(config: .infomaniak)
 
     func testBuildAuthorizationURL_targetsAuthorizationEndpoint() throws {
-        let url = client.buildAuthorizationURL(state: "s", pkce: PKCEChallenge(verifier: "v"))
+        let url = try client.buildAuthorizationURL(state: "s", pkce: PKCEChallenge(verifier: "v"))
         XCTAssertEqual(url.host, "login.infomaniak.com")
         XCTAssertEqual(url.path, "/authorize")
     }
 
     func testBuildAuthorizationURL_containsAllRequiredQueryItems() throws {
         let pkce = PKCEChallenge(verifier: "verifier-123")
-        let url = client.buildAuthorizationURL(state: "state-xyz", pkce: pkce)
+        let url = try client.buildAuthorizationURL(state: "state-xyz", pkce: pkce)
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         let query = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value) })
 

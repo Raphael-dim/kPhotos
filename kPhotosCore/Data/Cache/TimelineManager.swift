@@ -40,6 +40,12 @@ public protocol TimelineReading: AnyObject {
 }
 
 public final class TimelineManagerImpl: TimelineReading {
+    private struct MonthBucket {
+        let year: Int
+        let month: Int
+        var ids: [String]
+    }
+
     private let realm: RealmAccessor
     private let calendar: Calendar
 
@@ -60,7 +66,7 @@ public final class TimelineManagerImpl: TimelineReading {
         photos: some Sequence<Photo>,
         calendar: Calendar
     ) -> [TimelineSection] {
-        var buckets: [String: (year: Int, month: Int, ids: [String])] = [:]
+        var buckets: [String: MonthBucket] = [:]
         var order: [String] = []
 
         for photo in photos {
@@ -68,7 +74,7 @@ public final class TimelineManagerImpl: TimelineReading {
             guard let year = components.year, let month = components.month else { continue }
             let key = "\(year)-\(String(format: "%02d", month))"
             if buckets[key] == nil {
-                buckets[key] = (year, month, [])
+                buckets[key] = MonthBucket(year: year, month: month, ids: [])
                 order.append(key)
             }
             buckets[key]?.ids.append(photo.fileId)

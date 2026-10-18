@@ -31,11 +31,11 @@ public final class OAuth2Client {
         self.decoder = JSONDecoder()
     }
 
-    public func buildAuthorizationURL(state: String, pkce: PKCEChallenge) -> URL {
-        var components = URLComponents(
+    public func buildAuthorizationURL(state: String, pkce: PKCEChallenge) throws -> URL {
+        guard var components = URLComponents(
             url: config.authorizationEndpoint,
             resolvingAgainstBaseURL: false
-        )!
+        ) else { throw AuthError.invalidResponse }
         // Infomaniak n'utilise pas de paramètre `scope` — la portée est implicite au niveau du compte
         // (cf. github.com/Infomaniak/ios-login). `access_type=offline` est requis pour récupérer un refresh_token.
         components.queryItems = [
@@ -48,7 +48,7 @@ public final class OAuth2Client {
             URLQueryItem(name: "state", value: state)
         ]
         guard let url = components.url else {
-            preconditionFailure("Invalid authorization URL components")
+            throw AuthError.invalidResponse
         }
         return url
     }

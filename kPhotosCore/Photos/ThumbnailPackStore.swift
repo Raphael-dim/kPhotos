@@ -51,10 +51,11 @@ public actor ThumbnailPackStore: ThumbnailPackFetching {
         if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
            let size = attrs[.size] as? NSNumber, size.intValue <= 16 * 1024 * 1024,
            let modified = attrs[.modificationDate] as? Date {
-            if validated[key] == modified { usable = true } else if let bytes = try? Data(contentsOf: url),
-                                                                    SHA256.hash(data: bytes).map({ String(format: "%02x", $0) })
-                                                                    .joined() == reference.sha256 {
-                validated[key] = modified; usable = true
+            if validated[key] == modified {
+                usable = true
+            } else if let bytes = try? Data(contentsOf: url) {
+                let digest = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+                if digest == reference.sha256 { validated[key] = modified; usable = true }
             }
         }
         if !usable {
@@ -63,13 +64,17 @@ public actor ThumbnailPackStore: ThumbnailPackFetching {
                 task = Task {
                     let bytes = try await api.thumbnailPackData(driveId: driveId, reference: reference)
                     guard bytes.count <= 16 * 1024 * 1024,
-                          SHA256.hash(data: bytes).map({ String(format: "%02x", $0) }).joined() == reference.sha256 else { throw PhotoAPIError.invalidResponse }
+                          SHA256.hash(data: bytes).map({ String(format: "%02x", $0) }).joined() == reference.sha256 else {
+                        throw PhotoAPIError.invalidResponse
+                    }
                     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                     let free = try (
                         FileManager.default
                             .attributesOfFileSystem(forPath: directory.path)[.systemFreeSize] as? NSNumber
                     )?.int64Value ?? 0
-                    guard free - Int64(bytes.count) > 128 * 1024 * 1024 else { throw PhotoAPIError.invalidResponse }
+                    guard free - Int64(bytes.count) > 128 * 1024 * 1024 else {
+                        throw PhotoAPIError.invalidResponse
+                    }
                     try bytes.write(to: url, options: .atomic)
                     ImageDiskBudget.scheduleTrim(directory: directory, limit: 512 * 1024 * 1024)
                     return url

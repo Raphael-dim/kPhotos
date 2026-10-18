@@ -41,12 +41,14 @@ class LibraryTestAPI: PhotoApiFetching {
     func upload(
         driveId: Int,
         folderId: String,
-        fileURL: URL,
-        fileName: String,
+        source: UploadSource,
         createdAt: Date,
-        mimeType: String,
         clientToken: String
     ) async throws -> RemoteFileDTO {
+        let fileURL = source.fileURL
+        let fileName = source.fileName
+        let mimeType = source.mimeType
+
         uploads += 1
         let data = try Data(contentsOf: fileURL)
         let id = "upload-\(uploads)"

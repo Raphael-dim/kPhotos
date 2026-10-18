@@ -30,7 +30,7 @@ struct AlbumPickerSheet: View {
         NavigationStack {
             List {
                 ForEach(albums) { album in
-                    Button(action: { onSelect(album) }) {
+                    Button { onSelect(album) } label: {
                         Text(album.name)
                     }
                 }
