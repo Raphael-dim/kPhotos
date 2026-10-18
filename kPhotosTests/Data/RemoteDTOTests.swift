@@ -78,9 +78,12 @@ final class RemoteFileDTOTests: XCTestCase {
         XCTAssertEqual(makeDTO(createdAt: 100, addedAt: 200, lastModifiedAt: 300).bestTakenAt, 100)
     }
 
-    func testBestTakenAt_fallsBackToAddedAt_whenCreatedAtZero() {
-        // Régression upload web sans EXIF : created_at == 0 → on prend added_at.
-        XCTAssertEqual(makeDTO(createdAt: 0, addedAt: 200, lastModifiedAt: 300).bestTakenAt, 200)
+    func testBestTakenAt_prefersModificationOverUpload_whenCreatedAtZero() {
+        XCTAssertEqual(makeDTO(createdAt: 0, addedAt: 200, lastModifiedAt: 300).bestTakenAt, 300)
+    }
+
+    func testBestTakenAt_fallsBackToUploadOnlyWhenOtherDatesAreMissing() {
+        XCTAssertEqual(makeDTO(createdAt: 0, addedAt: 200, lastModifiedAt: 0).bestTakenAt, 200)
     }
 
     func testBestTakenAt_fallsBackToLastModified_whenCreatedAndAddedZero() {

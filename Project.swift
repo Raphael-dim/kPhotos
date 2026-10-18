@@ -113,7 +113,9 @@ let testsTarget = TargetFactory.tests(
     dependencies: [
         .target(name: "kPhotos"),
         .target(name: "kPhotosCore"),
-        .target(name: "kPhotosFeatures")
+        .target(name: "kPhotosFeatures"),
+        realm,
+        realmSwift
     ]
 )
 

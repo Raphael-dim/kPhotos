@@ -143,7 +143,7 @@ public final class AlbumManagerImpl: AlbumManaging {
             throw PhotoAPIError.network(underlying: "albumId invalide: \(albumId)")
         }
 
-        var cursor: String? = nil
+        var cursor: String?
         var orderedFileIds: [String] = []
         var serverFileIds: Set<String> = []
         repeat {
@@ -268,7 +268,7 @@ public final class AlbumManagerImpl: AlbumManaging {
                 }
             }
             if let album = realm.object(ofType: Album.self, forPrimaryKey: albumId) {
-                album.photoCount = album.photoCount + fileIds.count
+                album.photoCount += fileIds.count
                 // Album précédemment vide → la première photo ajoutée devient
                 // la cover pour que la grille des albums se peuple immédiatement.
                 if album.coverPhotoId.isEmpty, let first = fileIds.first {
@@ -291,7 +291,7 @@ public final class AlbumManagerImpl: AlbumManaging {
             }
             if let album = realm.object(ofType: Album.self, forPrimaryKey: albumId) {
                 if album.photoCount > 0 {
-                    album.photoCount = album.photoCount - 1
+                    album.photoCount -= 1
                 }
                 // Cover supprimée → invalidée, sera reconstruite au prochain
                 // `resolveCover` ou `refreshAlbumPhotos`.

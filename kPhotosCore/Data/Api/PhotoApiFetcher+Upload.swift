@@ -77,6 +77,7 @@ public extension PhotoApiFetcher {
             createdAt: createdAtUnix,
             clientToken: clientToken
         )
+        try await waitForRequest()
         APILog.request(
             method: "POST",
             url: endpoint.url,
@@ -93,6 +94,7 @@ public extension PhotoApiFetcher {
             .validate()
             .serializingDecodable(InfomaniakResponse<RemoteFileDTO>.self, decoder: decoder)
             .response
+        try Task.checkCancellation()
 
         if let envelope = response.value {
             APILog.response(url: endpoint.url, statusCode: response.response?.statusCode, body: response.data)

@@ -23,10 +23,8 @@ import os
 /// Logger dédié au layer API. Filtre dans Xcode : subsystem `app.kphotos`, category `api`.
 /// Console : `log stream --predicate 'subsystem == "app.kphotos"'`.
 ///
-/// Tout ce qui peut révéler une donnée utilisateur (URL avec IDs, body, JSON
-/// de réponse) est loggé en `privacy: .private` — visible en debug local, masqué
-/// dans les exports OSLog (sysdiagnose, Console.app sur un appareil tiers).
-/// Seuls la méthode HTTP et le code de statut restent publics.
+/// Les URL, identifiants, corps et réponses ne sont jamais journalisés.
+/// Seuls la méthode, le nom générique d'opération et le statut restent publics.
 enum APILog {
     static let logger = Logger(subsystem: "app.kphotos", category: "api")
 
@@ -65,11 +63,18 @@ public protocol PhotoApiFetching: AnyObject {
     func removeCategoryFromFiles(driveId: Int, categoryId: Int, fileIds: [Int]) async throws
     func listCategoryFiles(driveId: Int, categoryId: Int, cursor: String?, limit: Int) async throws -> FilePage
     func thumbnailData(driveId: Int, fileId: String) async throws -> Data
+    func thumbnailData(driveId: Int, fileId: String, revision: String, priority: Int) async throws -> Data
     func previewData(driveId: Int, fileId: String, width: Int?, height: Int?, quality: Int?) async throws -> Data
     func downloadURL(driveId: Int, fileId: String) -> URL
     func previewURL(driveId: Int, fileId: String) -> URL
     func deleteFile(driveId: Int, fileId: String) async throws
     func fileInfo(driveId: Int, fileId: String) async throws -> RemoteFileDetailDTO
+}
+
+public extension PhotoApiFetching {
+    func thumbnailData(driveId: Int, fileId: String, revision: String, priority: Int) async throws -> Data {
+        try await thumbnailData(driveId: driveId, fileId: fileId)
+    }
 }
 
 public final class PhotoApiFetcher: PhotoApiFetching {
@@ -78,6 +83,7 @@ public final class PhotoApiFetcher: PhotoApiFetching {
 
     let session: Session
     let decoder: JSONDecoder
+    private let requestBudget: APIRequestBudget?
 
     public init(interceptor: RequestInterceptor? = nil, decoder: JSONDecoder = .kPhotos) {
         let configuration = URLSessionConfiguration.default
@@ -85,6 +91,14 @@ public final class PhotoApiFetcher: PhotoApiFetching {
         configuration.timeoutIntervalForResource = 600
         self.session = Session(configuration: configuration, interceptor: interceptor)
         self.decoder = decoder
+        self.requestBudget = .shared
+    }
+
+    // Inject a local URLProtocol in transport tests without real credentials or network.
+    init(configuration: URLSessionConfiguration) {
+        self.session = Session(configuration: configuration)
+        self.decoder = .kPhotos
+        self.requestBudget = nil
     }
 
     public func previewURL(driveId: Int, fileId: String) -> URL {
@@ -107,12 +121,19 @@ public extension JSONDecoder {
 // MARK: - Retry helper
 
 extension PhotoApiFetcher {
+    func waitForRequest(priority: Int = 0) async throws {
+        try Task.checkCancellation()
+        try await requestBudget?.wait(priority: priority)
+    }
+
     func performWithRetry<T>(_ operation: @escaping () async throws -> T) async throws -> T {
         var lastError: Error?
         for attempt in 0 ..< Self.maxRetries {
             do {
+                try Task.checkCancellation()
                 return try await operation()
             } catch {
+                try Task.checkCancellation()
                 lastError = error
                 guard Self.isRetryable(error) else { throw error }
                 let delay = Self.baseBackoff * pow(2.0, Double(attempt))
@@ -127,9 +148,9 @@ extension PhotoApiFetcher {
         case PhotoAPIError.network,
              PhotoAPIError.rateLimited,
              PhotoAPIError.server(statusCode: 500 ..< 600, _):
-            return true
+            true
         default:
-            return false
+            false
         }
     }
 
@@ -140,13 +161,7 @@ extension PhotoApiFetcher {
         body: Data? = nil
     ) -> PhotoAPIError {
         if let url { APILog.response(url: url, statusCode: statusCode, body: body) }
-        let bodySnippet = body.flatMap { String(data: $0, encoding: .utf8) }?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .prefix(2000)
-        let suffix = [
-            url.map { "url=\($0.absoluteString)" },
-            bodySnippet.map { "body=\($0)" }
-        ].compactMap { $0 }.joined(separator: " | ")
+        let suffix = ""
 
         if let code = statusCode {
             let message = [error.errorDescription, suffix.isEmpty ? nil : suffix]

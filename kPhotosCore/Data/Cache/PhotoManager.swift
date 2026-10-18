@@ -39,6 +39,10 @@ public protocol PhotoWriting: AnyObject {
     /// Sans ça, un `refreshFolder` casserait la dédup local↔cloud du `GalleryComposer`
     /// (qui matche par `localIdentifier`) → photos dupliquées dans la galerie.
     func upsertFromListing(_ photos: [PhotoSnapshot]) async throws
+    func commitListing(
+        _ photos: [PhotoSnapshot], driveId: Int, folderId: String,
+        fileIds: Set<String>, revisions: [String: String]
+    ) async throws
     func updateSyncStatus(fileId: String, status: PhotoSyncStatus) async throws
     func setFavorite(fileId: String, isFavorite: Bool) async throws
     func delete(fileId: String) async throws
@@ -249,9 +253,37 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
                 if let existing {
                     photo.isFavorite = existing.isFavorite
                     photo.albumIds.removeAll()
+                    photo.albumIds.removeAll()
                     photo.albumIds.append(objectsIn: existing.albumIds)
                 }
 
+                realm.add(photo, update: .modified)
+            }
+        }
+    }
+
+    public func commitListing(
+        _ snapshots: [PhotoSnapshot], driveId: Int, folderId: String,
+        fileIds: Set<String>, revisions: [String: String]
+    ) async throws {
+        try await realm.write { realm in
+            for existing in realm.objects(Photo.self).filter("driveId == %@ AND libraryRootId == %@", driveId, folderId) {
+                existing.isAvailable = false
+            }
+            for snapshot in snapshots {
+                let photo = Self.makePhoto(from: snapshot)
+                if let existing = realm.object(ofType: Photo.self, forPrimaryKey: snapshot.id), existing.driveId == driveId {
+                    photo.localIdentifier = existing.localIdentifier
+                    photo.isFavorite = existing.isFavorite
+                    photo.albumIds.removeAll()
+                    photo.albumIds.append(objectsIn: existing.albumIds)
+                    if !existing.localIdentifier.isEmpty {
+                        photo.takenAt = existing.takenAt
+                        photo.captureDateSource = "photokit"
+                    }
+                }
+                photo.libraryRootId = folderId
+                photo.isAvailable = true
                 realm.add(photo, update: .modified)
             }
         }
@@ -666,6 +698,10 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
         photo.driveId = snapshot.driveId
         photo.localIdentifier = snapshot.localIdentifier
         photo.name = snapshot.name
+        photo.captureDateSource = snapshot.captureDateSource
+        photo.remoteRevision = snapshot.remoteRevision
+        photo.isAvailable = snapshot.isAvailable
+        photo.libraryRootId = snapshot.libraryRootId
         photo.takenAt = snapshot.takenAt
         photo.uploadedAt = snapshot.uploadedAt
         photo.mimeType = snapshot.mimeType

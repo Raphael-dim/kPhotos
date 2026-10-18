@@ -22,20 +22,26 @@ import Foundation
 public extension PhotoApiFetcher {
     /// Télécharge un thumbnail JPEG (auth requis). Utiliser le cache côté UI.
     func thumbnailData(driveId: Int, fileId: String) async throws -> Data {
-        let endpoint = Endpoint.thumbnail(driveId: driveId, fileId: fileId)
+        try await thumbnailData(driveId: driveId, fileId: fileId, revision: "", priority: 2)
+    }
+
+    func thumbnailData(driveId: Int, fileId: String, revision: String, priority: Int) async throws -> Data {
+        let endpoint = Endpoint.thumbnail(driveId: driveId, fileId: fileId, revision: revision)
         return try await performWithRetry { [weak self] in
             guard let self else { throw PhotoAPIError.network(underlying: "fetcher deallocated") }
-            return try await requestThumbnail(endpoint: endpoint)
+            return try await requestThumbnail(endpoint: endpoint, priority: priority)
         }
     }
 
-    private func requestThumbnail(endpoint: Endpoint) async throws -> Data {
+    private func requestThumbnail(endpoint: Endpoint, priority: Int) async throws -> Data {
+        try await waitForRequest(priority: priority)
         APILog.request(method: "GET", url: endpoint.url, body: nil)
         let response = await session
             .request(endpoint.url, method: .get)
             .validate()
             .serializingData()
             .response
+        try Task.checkCancellation()
 
         if let data = response.value {
             APILog.response(url: endpoint.url, statusCode: response.response?.statusCode, body: nil)

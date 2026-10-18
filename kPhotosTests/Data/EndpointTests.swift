@@ -107,7 +107,7 @@ final class EndpointTests: XCTestCase {
         XCTAssertEqual(q["total_size"], "2048")
         XCTAssertEqual(q["created_at"], "1577836800")
         XCTAssertEqual(q["client_token"], "tok-abc")
-        XCTAssertEqual(q["conflict"], "version", "Défaut documenté pour l'idempotence")
+        XCTAssertEqual(q["conflict"], "error", "A collision must never replace existing bytes")
     }
 
     func testPreview_withoutParams_hasNoQuery() {
@@ -150,13 +150,6 @@ final class EndpointTests: XCTestCase {
         XCTAssertEqual(endpoint.url.path, "/3/drive/7/files/search")
         XCTAssertEqual(query(of: endpoint)["type"], "image")
         XCTAssertEqual(query(of: endpoint)["limit"], "100")
-    }
-
-    func testCreateFolder_carriesParentAndName() {
-        let endpoint = Endpoint.createFolder(driveId: 7, parentId: "1", folderName: "kPhotos")
-        XCTAssertEqual(endpoint.url.path, "/3/drive/7/directories")
-        XCTAssertEqual(query(of: endpoint)["parent_id"], "1")
-        XCTAssertEqual(query(of: endpoint)["directory_name"], "kPhotos")
     }
 
     func testListDrives_targetsInitWithDrives() {

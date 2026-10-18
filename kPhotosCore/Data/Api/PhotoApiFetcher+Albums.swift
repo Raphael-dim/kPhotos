@@ -109,6 +109,7 @@ public extension PhotoApiFetcher {
         method: HTTPMethod,
         parameters: [String: Any]? = nil
     ) async throws -> T {
+        try await waitForRequest()
         APILog.request(method: method.rawValue, url: endpoint.url, body: parameters)
         let decoder = decoder
         let request: DataRequest
@@ -126,6 +127,7 @@ public extension PhotoApiFetcher {
             .validate()
             .serializingDecodable(InfomaniakResponse<T>.self, decoder: decoder)
             .response
+        try Task.checkCancellation()
 
         if let value = response.value {
             APILog.response(url: endpoint.url, statusCode: response.response?.statusCode, body: response.data)
@@ -147,6 +149,7 @@ public extension PhotoApiFetcher {
         method: HTTPMethod,
         parameters: [String: Any]? = nil
     ) async throws -> Bool {
+        try await waitForRequest()
         APILog.request(method: method.rawValue, url: endpoint.url, body: parameters)
         let request: DataRequest
         if let parameters {
@@ -163,6 +166,7 @@ public extension PhotoApiFetcher {
             .validate()
             .serializingData()
             .response
+        try Task.checkCancellation()
 
         if response.error == nil {
             APILog.response(url: endpoint.url, statusCode: response.response?.statusCode, body: response.data)

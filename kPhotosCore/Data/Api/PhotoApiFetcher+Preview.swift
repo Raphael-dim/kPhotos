@@ -31,8 +31,11 @@ public extension PhotoApiFetcher {
         quality: Int? = nil
     ) async throws -> Data {
         let endpoint = Endpoint.preview(
-            driveId: driveId, fileId: fileId,
-            width: width, height: height, quality: quality
+            driveId: driveId,
+            fileId: fileId,
+            width: width,
+            height: height,
+            quality: quality
         )
         return try await performWithRetry { [weak self] in
             guard let self else { throw PhotoAPIError.network(underlying: "fetcher deallocated") }
@@ -44,12 +47,14 @@ public extension PhotoApiFetcher {
         let endpoint = Endpoint.fileInfo(driveId: driveId, fileId: fileId)
         return try await performWithRetry { [weak self] in
             guard let self else { throw PhotoAPIError.network(underlying: "fetcher deallocated") }
+            try await waitForRequest(priority: 2)
             APILog.request(method: "GET", url: endpoint.url, body: nil)
             let response = await session
                 .request(endpoint.url, method: .get)
                 .validate()
                 .serializingDecodable(InfomaniakResponse<RemoteFileDetailDTO>.self, decoder: decoder)
                 .response
+            try Task.checkCancellation()
             if let dto = response.value {
                 APILog.response(url: endpoint.url, statusCode: response.response?.statusCode, body: response.data)
                 return dto.data
@@ -67,12 +72,14 @@ public extension PhotoApiFetcher {
     }
 
     private func requestPreview(endpoint: Endpoint) async throws -> Data {
+        try await waitForRequest(priority: 2)
         APILog.request(method: "GET", url: endpoint.url, body: nil)
         let response = await session
             .request(endpoint.url, method: .get)
             .validate()
             .serializingData()
             .response
+        try Task.checkCancellation()
 
         if let data = response.value {
             APILog.response(url: endpoint.url, statusCode: response.response?.statusCode, body: nil)

@@ -59,6 +59,7 @@ public extension PhotoApiFetcher {
     }
 
     internal func requestList(endpoint: Endpoint) async throws -> FilePage {
+        try await waitForRequest(priority: 1)
         APILog.request(method: "GET", url: endpoint.url, body: nil)
         let decoder = decoder
         let response = await session
@@ -66,9 +67,12 @@ public extension PhotoApiFetcher {
             .validate()
             .serializingDecodable(RemoteFileListDTO.self, decoder: decoder)
             .response
+        try Task.checkCancellation()
 
         if let dto = response.value {
             APILog.response(url: endpoint.url, statusCode: response.response?.statusCode, body: response.data)
+            guard dto.result != "error" else { throw PhotoAPIError.invalidResponse }
+            if dto.hasMore == true, dto.cursor?.isEmpty ?? true { throw PhotoAPIError.invalidResponse }
             let next: String? = (dto.hasMore == true) ? dto.cursor : nil
             return FilePage(items: dto.data, nextCursor: next)
         }

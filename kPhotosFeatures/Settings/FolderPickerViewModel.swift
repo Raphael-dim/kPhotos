@@ -79,8 +79,15 @@ public final class FolderPickerViewModel: ObservableObject {
         if !keepCurrent { isLoading = true }
         defer { if !keepCurrent { isLoading = false } }
         do {
-            let page = try await api.listFolder(driveId: driveId, folderId: folderId, cursor: nil, limit: 100)
-            let folders = page.items.filter(\.isDirectory)
+            var folders: [RemoteFileDTO] = []
+            var cursor: String?
+            var visited = Set<String>()
+            repeat {
+                let page = try await api.listFolder(driveId: driveId, folderId: folderId, cursor: cursor, limit: 100)
+                folders.append(contentsOf: page.items.filter(\.isDirectory))
+                cursor = page.nextCursor
+                if let cursor, !visited.insert(cursor).inserted { throw PhotoAPIError.invalidResponse }
+            } while cursor != nil
             if !keepCurrent {
                 currentFolder = FolderNode(
                     folderId: folderId,

@@ -118,19 +118,16 @@ public final class PhotoSyncEngine: PhotoSyncing {
     }
 
     public func refreshFolder(driveId: Int, folderId: String) async throws {
-        var aggregated: [PhotoSnapshot] = []
-        var cursor: String? = nil
-        repeat {
-            let page = try await api.listFolder(driveId: driveId, folderId: folderId, cursor: cursor, limit: 100)
-            // Filtrer pour ne garder que les fichiers (le listing inclut les sous-dossiers).
-            let files = page.items.filter { !$0.isDirectory }
-            aggregated.append(contentsOf: files.map { Self.makeSnapshot(from: $0, driveId: driveId) })
-            cursor = page.nextCursor
-        } while cursor != nil
-        // `upsertFromListing` préserve `localIdentifier`, `isFavorite`, `albumIds` —
-        // sans quoi un `refreshFolder` écraserait le lien PHAsset des photos uploadées
-        // depuis l'app et le `GalleryComposer` afficherait des doublons.
-        try await photoWriter.upsertFromListing(aggregated)
+        let snapshots = try await LibraryScanner(api: api).scan(driveId: driveId, rootId: folderId)
+        try Task.checkCancellation()
+        try await photoWriter.commitListing(
+            snapshots.photos,
+            driveId: driveId,
+            folderId: folderId,
+            fileIds: snapshots.fileIds,
+            revisions: snapshots.revisions
+        )
+        LibraryRefreshSchedule().markSuccess(driveId: driveId, rootId: folderId)
     }
 
     public func reconcile() async throws {
@@ -315,7 +312,7 @@ public final class PhotoSyncEngine: PhotoSyncing {
     /// Construit un snapshot pour un asset local fraîchement uploadé.
     /// Règle §6 critique : `takenAt` vient de PHAsset, jamais du serveur.
     static func makeSnapshot(from dto: RemoteFileDTO, exported: ExportedAsset, driveId: Int) -> PhotoSnapshot {
-        PhotoSnapshot(
+        var snapshot = PhotoSnapshot(
             id: dto.id,
             driveId: driveId,
             localIdentifier: exported.localIdentifier,
@@ -330,6 +327,9 @@ public final class PhotoSyncEngine: PhotoSyncing {
             syncStatus: .synced,
             isFavorite: false
         )
+        snapshot.remoteRevision = dto.revision
+        snapshot.captureDateSource = "photokit"
+        return snapshot
     }
 
     /// Construit un snapshot pour un fichier découvert en listant kDrive (pas de PHAsset local).
@@ -341,7 +341,7 @@ public final class PhotoSyncEngine: PhotoSyncing {
     static func makeSnapshot(from dto: RemoteFileDTO, driveId: Int) -> PhotoSnapshot {
         let takenTimestamp = dto.bestTakenAt
         let uploadedTimestamp = dto.addedAt > 0 ? dto.addedAt : dto.lastModifiedAt
-        return PhotoSnapshot(
+        var snapshot = PhotoSnapshot(
             id: dto.id,
             driveId: driveId,
             localIdentifier: "",
@@ -350,12 +350,15 @@ public final class PhotoSyncEngine: PhotoSyncing {
             uploadedAt: Date(timeIntervalSince1970: TimeInterval(uploadedTimestamp)),
             mimeType: dto.mimeType,
             size: dto.size,
-            isVideo: dto.mimeType.hasPrefix("video/"),
+            isVideo: dto.isVideoMedia,
             duration: 0,
             albumIds: [],
             syncStatus: .synced,
             isFavorite: false
         )
+        snapshot.remoteRevision = dto.revision
+        snapshot.captureDateSource = "kdrive"
+        return snapshot
     }
 }
 
@@ -432,5 +435,48 @@ public enum BackupRetryClassifier {
         let exponent = max(0, attempt - 1) // 1ère tentative ratée → 30s, pas 60s
         let raw = base * pow(2, Double(exponent))
         return min(raw, 24 * 3600)
+    }
+}
+
+public struct CloudLibraryRefresh {
+    private let drives: DriveManaging
+    private let settings: SyncSettingsReading
+    private let sync: PhotoSyncing
+    private let photos: PhotoReading
+
+    public init(drives: DriveManaging, settings: SyncSettingsReading, sync: PhotoSyncing, photos: PhotoReading) {
+        self.drives = drives
+        self.settings = settings
+        self.sync = sync
+        self.photos = photos
+    }
+
+    public func load() async throws -> [PhotoSnapshot] {
+        while let drive = try drives.selectedDrive() {
+            try Task.checkCancellation()
+            let name = try settings.current().rootFolderName
+            var root = drive.rootFolderId
+            do {
+                root = try await drives.existingRootFolder(folderName: name)
+                try await sync.refreshFolder(driveId: drive.id, folderId: root)
+                try Task.checkCancellation()
+                guard try stillSelected(driveId: drive.id, root: root, name: name) else { continue }
+                return try photos.allPhotos().filter {
+                    $0.driveId == drive.id && $0.libraryRootId == root && $0.isAvailable
+                }
+            } catch {
+                try Task.checkCancellation()
+                // A failure for an obsolete folder must not prevent the newly selected one loading.
+                guard try stillSelected(driveId: drive.id, root: root, name: name) else { continue }
+                throw error
+            }
+        }
+        return []
+    }
+
+    private func stillSelected(driveId: Int, root: String, name: String) throws -> Bool {
+        guard let current = try drives.selectedDrive() else { return false }
+        let currentName = try settings.current().rootFolderName
+        return current.id == driveId && current.rootFolderId == root && currentName == name
     }
 }

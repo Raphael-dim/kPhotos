@@ -28,6 +28,7 @@ public extension PhotoApiFetcher {
     }
 
     private func requestDrives() async throws -> [RemoteDriveDTO] {
+        try await waitForRequest(priority: 2)
         APILog.request(method: "GET", url: Endpoint.listDrives.url, body: nil)
         let decoder = decoder
         let response = await session
@@ -35,6 +36,7 @@ public extension PhotoApiFetcher {
             .validate()
             .serializingDecodable(RemoteDriveListResponse.self, decoder: decoder)
             .response
+        try Task.checkCancellation()
 
         if let value = response.value {
             APILog.response(url: Endpoint.listDrives.url, statusCode: response.response?.statusCode, body: response.data)

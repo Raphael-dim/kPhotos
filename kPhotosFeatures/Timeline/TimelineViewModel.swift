@@ -96,28 +96,40 @@ public final class TimelineViewModel: ObservableObject {
     @Published public private(set) var lastDeletionFailures: [DeletionFailure] = []
 
     /// Empêche les refresh distants concurrents (open + pull-to-refresh quasi simultanés).
-    private var isRefreshingCloud = false
+    @Published public private(set) var isRefreshingCloud = false
+    @Published public private(set) var cloudRefreshError: String?
 
     public init() {
         bindToUploadQueue()
+        bindToLibrarySettings()
+    }
+
+    private func bindToLibrarySettings() {
+        syncSettings.publisher
+            .receive(on: DispatchQueue.main)
+            .map { [weak self] snapshot in
+                let drive = try? self?.driveManager.selectedDrive()
+                return [snapshot.rootFolderName, String(drive?.id ?? 0), drive?.rootFolderId ?? ""]
+            }
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                cloudPhotos = (try? currentLibraryPhotos()) ?? []
+                cloudRefreshError = nil
+                if case .ready(let summary, _) = state { rebuildState(summary: summary) }
+                Task {
+                    await self.refreshCloud()
+                    await self.reconcileBackupQueue()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     public func load() async {
         let auth = assetReader.currentAuthorization()
-        switch auth {
-        case .notDetermined:
-            state = .permissionNeeded
-            return
-        case .denied, .restricted:
-            state = .permissionDenied
-            return
-        case .authorized, .limited:
-            // Démarre l'observation PhotoKit dès qu'on a l'autorisation. Idempotent
-            // — appel à chaque `load()` sans effet après le premier (singleton DI).
-            // Une nouvelle photo prise depuis l'appareil sera automatiquement
-            // enqueued dans `BackupItem` via `photoLibraryDidChange`.
-            photoLibraryObserver.startObserving()
-        }
+        let hasLocalAccess = auth == .authorized || auth == .limited
+        if hasLocalAccess { photoLibraryObserver.startObserving() }
 
         // `try?` aplatit `throws -> DriveSnapshot?` en `DriveSnapshot?` (throw et nil
         // sont indistinguables ici — les deux signifient "pas de drive utilisable").
@@ -128,26 +140,35 @@ public final class TimelineViewModel: ObservableObject {
 
         // 1. PhotoKit en premier — instantané, c'est ce qui fait que la galerie
         //    apparaît "déjà disponible" à l'ouverture.
-        localAssets = await assetReader.fetchAssetSnapshots(filter: .both)
+        localAssets = hasLocalAccess ? await assetReader.fetchAssetSnapshots(filter: .both) : []
         // 2. Realm — éventuellement vide au premier lancement.
-        cloudPhotos = (try? photos.allPhotos()) ?? []
+        cloudPhotos = (try? currentLibraryPhotos()) ?? []
         backupItems = Self.indexByLocalId((try? backupQueue.allItems()) ?? [])
         deletionItems = Self.indexDeletionsByFileId((try? deletionQueue.allDeletions()) ?? [])
 
-        let summary = await assetReader.summary()
+        let summary = hasLocalAccess ? await assetReader.summary() : .empty
         rebuildState(summary: summary)
 
         // 3a. Réconcilie la file persistante avec la photothèque iOS — enqueue
         //    en arrière-plan les assets locaux qui ne sont ni synced cloud ni
         //    déjà connus de la file. Idempotent, sûr à lancer à chaque load().
         //    Une fois fini, on relit la file pour rafraîchir les badges.
-        Task { await reconcileBackupQueue() }
+        if hasLocalAccess { Task { await reconcileBackupQueue() } }
 
         // 3b. Refresh distant en tâche de fond : on récupère les fichiers ajoutés
         //    depuis un autre appareil (web, autre tel, etc.) sans bloquer l'UI.
         //    Le cache local s'affiche immédiatement, puis les nouveaux fichiers
         //    apparaissent quand le listing kDrive revient.
-        Task { await refreshCloud() }
+        Task {
+            guard let drive = try? driveManager.selectedDrive(), !drive.rootFolderId.isEmpty else { return }
+            if LibraryRefreshSchedule().shouldRefresh(
+                driveId: drive.id,
+                rootId: drive.rootFolderId,
+                hasCache: !cloudPhotos.isEmpty
+            ) {
+                await refreshCloud()
+            }
+        }
 
         // 3c. Drain de la file de suppression — reprend après un crash ou un
         //     redémarrage de l'app si des deletes étaient en cours. Idempotent,
@@ -176,16 +197,17 @@ public final class TimelineViewModel: ObservableObject {
         isRefreshingCloud = true
         defer { isRefreshingCloud = false }
 
-        guard let drive = try? driveManager.selectedDrive() else { return }
         do {
-            let rootFolderId = try await driveManager.ensureRootFolder(folderName: rootFolderName)
-            try await sync.refreshFolder(driveId: drive.id, folderId: rootFolderId)
-            cloudPhotos = (try? photos.allPhotos()) ?? []
+            cloudPhotos = try await CloudLibraryRefresh(
+                drives: driveManager, settings: syncSettings, sync: sync, photos: photos
+            ).load()
+            cloudRefreshError = nil
             if case .ready(let summary, _) = state {
                 rebuildState(summary: summary)
             }
         } catch {
-            // Volontairement silencieux : la galerie reste utilisable hors-ligne.
+            if error is CancellationError || Task.isCancelled { return }
+            cloudRefreshError = error.localizedDescription
         }
     }
 
@@ -203,6 +225,13 @@ public final class TimelineViewModel: ObservableObject {
     /// avant local — le preview HD kDrive est généralement plus pratique que la
     /// requête `PHImageManager` (déjà en cache après la sync). Retourne nil si
     /// l'item ne pointe vers aucune source résolvable (cas improbable).
+    private func currentLibraryPhotos() throws -> [PhotoSnapshot] {
+        guard let drive = try driveManager.selectedDrive(), !drive.rootFolderId.isEmpty else { return [] }
+        return try photos.allPhotos().filter {
+            $0.driveId == drive.id && $0.libraryRootId == drive.rootFolderId && $0.isAvailable
+        }
+    }
+
     public func viewerMedia(for item: GalleryItem) -> ViewerMedia? {
         if let fileId = item.cloudFileId,
            let snapshot = cloudPhotos.first(where: { $0.fileId == fileId }) {
@@ -471,7 +500,7 @@ public final class TimelineViewModel: ObservableObject {
     /// (soit en cloudOnly, soit "synced" derrière un PHAsset local).
     private func refreshDeletionState(alsoReloadCloud: Bool = false) async {
         if alsoReloadCloud {
-            cloudPhotos = (try? photos.allPhotos()) ?? []
+            cloudPhotos = (try? currentLibraryPhotos()) ?? []
         }
         deletionItems = Self.indexDeletionsByFileId((try? deletionQueue.allDeletions()) ?? [])
         if case .ready(let summary, _) = state {

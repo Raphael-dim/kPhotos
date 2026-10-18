@@ -17,6 +17,7 @@
  */
 
 @testable import kPhotosCore
+import RealmSwift
 import XCTest
 
 /// Tests des modèles Realm (instanciés non-managés) et de leurs snapshots
@@ -59,13 +60,21 @@ final class PhotoModelTests: XCTestCase {
         XCTAssertTrue(snapshot.albumIds.isEmpty)
     }
 
-    func testMakePhoto_fromSnapshot_copiesAllFields() {
-        let snapshot = PhotoSnapshot(
-            id: "F1", driveId: 5, localIdentifier: "L1", name: "x.jpg",
+    func testMakePhoto_fromSnapshot_copiesAllFields() throws {
+        var snapshot = PhotoSnapshot(
+            id: "F1",
+            driveId: 5,
+            localIdentifier: "L1",
+            name: "x.jpg",
             takenAt: Date(timeIntervalSince1970: 1000),
             uploadedAt: Date(timeIntervalSince1970: 2000),
-            mimeType: "image/jpeg", size: 123, isVideo: false, duration: 0,
-            albumIds: ["a", "b"], syncStatus: .synced, isFavorite: true
+            mimeType: "image/jpeg",
+            size: 123,
+            isVideo: false,
+            duration: 0,
+            albumIds: ["a", "b"],
+            syncStatus: .synced,
+            isFavorite: true
         )
         let photo = PhotoManagerImpl.makePhoto(from: snapshot)
         XCTAssertEqual(photo.fileId, "F1")
@@ -224,5 +233,93 @@ final class SyncSettingsModelTests: XCTestCase {
         XCTAssertTrue(snapshot.isAutoSyncEnabled)
         XCTAssertEqual(snapshot.networkPolicy, .unrestricted)
         XCTAssertEqual(snapshot.mediaFilter, .videosOnly)
+    }
+}
+
+final class LegacyRealmEncryptionTests: XCTestCase {
+    private func directory() throws -> URL {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        return url
+    }
+
+    func testPlaintextLibraryIsPreservedAndEncrypted() throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        var config = Realm.Configuration(
+            fileURL: folder.appendingPathComponent("library.realm"),
+            schemaVersion: 10,
+            objectTypes: [Drive.self, Photo.self, Album.self, BackupItem.self, SyncSettings.self]
+        )
+        try autoreleasepool {
+            let realm = try Realm(configuration: config)
+            let drive = Drive()
+            drive.id = 42; drive.name = "Library"; drive.isSelected = true; drive.rootFolderId = "57997"
+            let photo = Photo()
+            photo.fileId = "old-photo"; photo.isFavorite = true; photo.name = "original.heic"
+            let album = Album()
+            album.id = "old-album"; album.name = "Trip"
+            let pending = BackupItem()
+            pending.localIdentifier = "local-original"; pending.state = .failedTransient
+            let settings = SyncSettings()
+            settings.rootFolderName = "Photos & Vidéos"
+            try realm.write { realm.add([drive, photo, album, pending, settings]) }
+        }
+        let original = try Data(contentsOf: config.fileURL!)
+        config.encryptionKey = Data(repeating: 17, count: 64)
+        try LegacyRealmEncryption.prepare(config)
+        let backups = try FileManager.default.contentsOfDirectory(
+            at: folder.appendingPathComponent("DiagnosticBackups"),
+            includingPropertiesForKeys: nil
+        )
+        XCTAssertEqual(backups.count, 1)
+        XCTAssertEqual(try Data(contentsOf: backups[0].appendingPathComponent("library.realm")), original)
+        try autoreleasepool {
+            let realm = try Realm(configuration: config)
+            XCTAssertEqual(realm.objects(Drive.self).first?.rootFolderId, "57997")
+            XCTAssertTrue(realm.objects(Drive.self).first?.isSelected == true)
+            XCTAssertTrue(realm.objects(Photo.self).first?.isFavorite == true)
+            XCTAssertEqual(realm.objects(Photo.self).first?.name, "original.heic")
+            XCTAssertEqual(realm.objects(Album.self).first?.name, "Trip")
+            XCTAssertEqual(realm.objects(BackupItem.self).first?.state, .failedTransient)
+            XCTAssertEqual(realm.objects(SyncSettings.self).first?.rootFolderName, "Photos & Vidéos")
+        }
+        let encrypted = try Data(contentsOf: config.fileURL!)
+        try LegacyRealmEncryption.prepare(config)
+        XCTAssertEqual(try Data(contentsOf: config.fileURL!), encrypted)
+    }
+
+    func testUnknownEncryptedKeyNeverReplacesTheDatabase() throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        var config = Realm.Configuration(
+            fileURL: folder.appendingPathComponent("library.realm"),
+            encryptionKey: Data(repeating: 18, count: 64),
+            objectTypes: [Drive.self]
+        )
+        try autoreleasepool { _ = try Realm(configuration: config) }
+        let original = try Data(contentsOf: config.fileURL!)
+        config.encryptionKey = Data(repeating: 19, count: 64)
+        try LegacyRealmEncryption.prepare(config)
+        XCTAssertEqual(try Data(contentsOf: config.fileURL!), original)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("DiagnosticBackups").path))
+    }
+
+    func testInvalidPlaintextHeaderIsBackedUpWithoutReplacement() throws {
+        let folder = try directory()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        var bytes = Data(repeating: 0, count: 64)
+        bytes.replaceSubrange(16 ..< 20, with: Data("T-DB".utf8))
+        bytes[20] = 255; bytes[21] = 255 // Invalid Realm file format, not a valid empty header.
+        let file = folder.appendingPathComponent("library.realm")
+        try bytes.write(to: file)
+        let config = Realm.Configuration(fileURL: file, encryptionKey: Data(repeating: 20, count: 64), objectTypes: [Drive.self])
+        XCTAssertThrowsError(try LegacyRealmEncryption.prepare(config))
+        XCTAssertEqual(try Data(contentsOf: file), bytes)
+        let backups = try FileManager.default.contentsOfDirectory(
+            at: folder.appendingPathComponent("DiagnosticBackups"),
+            includingPropertiesForKeys: nil
+        )
+        XCTAssertEqual(try Data(contentsOf: backups[0].appendingPathComponent("library.realm")), bytes)
     }
 }

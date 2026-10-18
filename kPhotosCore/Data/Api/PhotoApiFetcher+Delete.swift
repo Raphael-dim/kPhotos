@@ -29,14 +29,16 @@ public extension PhotoApiFetcher {
     }
 
     private func requestDelete(endpoint: Endpoint) async throws {
+        try await waitForRequest()
         APILog.request(method: "DELETE", url: endpoint.url, body: nil)
         let response = await session
             .request(endpoint.url, method: .delete)
             .validate()
             .serializingData()
             .response
+        try Task.checkCancellation()
 
-        if response.response != nil {
+        if response.error == nil, response.response != nil {
             APILog.response(url: endpoint.url, statusCode: response.response?.statusCode, body: response.data)
             return
         }

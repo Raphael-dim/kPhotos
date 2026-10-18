@@ -159,7 +159,8 @@ final class PhotoSyncEngineMappingTests: XCTestCase {
             attemptCount: 1
         )
         guard case .transient = decision else {
-            return XCTFail("Expected .transient, got \(decision)")
+            XCTFail("Expected .transient, got \(decision)")
+            return
         }
     }
 
@@ -169,7 +170,8 @@ final class PhotoSyncEngineMappingTests: XCTestCase {
             attemptCount: 1
         )
         guard case .transient = decision else {
-            return XCTFail("Expected .transient, got \(decision)")
+            XCTFail("Expected .transient, got \(decision)")
+            return
         }
     }
 

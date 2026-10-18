@@ -45,7 +45,7 @@ public extension Endpoint {
         totalSize: Int,
         createdAt: Int,
         clientToken: String,
-        conflict: String = "version"
+        conflict: String = "error"
     ) -> Endpoint {
         Endpoint(
             path: "/3/drive/\(driveId)/upload",
@@ -77,8 +77,11 @@ public extension Endpoint {
         return Endpoint(path: "/2/drive/\(driveId)/files/\(fileId)/preview", queryItems: items)
     }
 
-    static func thumbnail(driveId: Int, fileId: String) -> Endpoint {
-        Endpoint(path: "/2/drive/\(driveId)/files/\(fileId)/thumbnail")
+    static func thumbnail(driveId: Int, fileId: String, revision: String = "") -> Endpoint {
+        let timestamps = revision.split(separator: ":").prefix(2).compactMap { Int($0) }
+        let timestamp = timestamps.max().flatMap { $0 > 0 ? $0 : nil }
+        let items = timestamp.map { [URLQueryItem(name: "t", value: String($0))] } ?? []
+        return Endpoint(path: "/2/drive/\(driveId)/files/\(fileId)/thumbnail", queryItems: items)
     }
 
     static func download(driveId: Int, fileId: String) -> Endpoint {
@@ -100,15 +103,5 @@ public extension Endpoint {
         ]
         if let cursor { items.append(URLQueryItem(name: "cursor", value: cursor)) }
         return Endpoint(path: "/3/drive/\(driveId)/files/search", queryItems: items)
-    }
-
-    static func createFolder(driveId: Int, parentId: String, folderName: String) -> Endpoint {
-        Endpoint(
-            path: "/3/drive/\(driveId)/directories",
-            queryItems: [
-                URLQueryItem(name: "parent_id", value: parentId),
-                URLQueryItem(name: "directory_name", value: folderName)
-            ]
-        )
     }
 }

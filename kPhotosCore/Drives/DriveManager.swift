@@ -38,6 +38,8 @@ public protocol DriveManaging: AnyObject {
 
     /// Invalide les `rootFolderId` mémorisés — à appeler quand l'utilisateur
     /// change le nom du dossier de destination dans les réglages.
+    func selectRootFolder(id: String) async throws
+    func existingRootFolder(folderName: String) async throws -> String
     func resetCachedRootFolders() async throws
 }
 
@@ -56,13 +58,14 @@ public final class DriveManagerImpl: DriveManaging {
         try await realm.write { realm in
             // Préserver l'état "isSelected" et "rootFolderId" lors du refresh.
             let existing = realm.objects(Drive.self)
-            var existingMap: [Int: (Bool, String)] = [:]
+            var existingMap: [Int: (Bool, String, String)] = [:]
             for drive in existing {
-                existingMap[drive.id] = (drive.isSelected, drive.rootFolderId)
+                existingMap[drive.id] = (drive.isSelected, drive.rootFolderId, drive.privateSpaceId)
             }
             let mapped = remote.map { Self.makeDrive(from: $0) }
             for drive in mapped {
-                if let (selected, rootId) = existingMap[drive.id] {
+                if let (selected, rootId, privateId) = existingMap[drive.id] {
+                    drive.privateSpaceId = privateId
                     drive.isSelected = selected
                     drive.rootFolderId = rootId
                 }
@@ -104,8 +107,8 @@ public final class DriveManagerImpl: DriveManaging {
         if !drive.privateSpaceId.isEmpty { return drive.privateSpaceId }
 
         // Liste la racine système (id=1) et cherche l'entrée avec visibility="is_private_space".
-        var cursor: String? = nil
-        var foundId: String? = nil
+        var cursor: String?
+        var foundId: String?
         repeat {
             let page = try await api.listFolder(driveId: drive.id, folderId: "1", cursor: cursor, limit: 100)
             if let priv = page.items.first(where: { $0.visibility == "is_private_space" && $0.isDirectory }) {
@@ -126,6 +129,26 @@ public final class DriveManagerImpl: DriveManaging {
         return privateId
     }
 
+    public func selectRootFolder(id: String) async throws {
+        guard !id.isEmpty, id != "1", let drive = try selectedDrive() else { throw PhotoAPIError.invalidResponse }
+        // Validate access and directory type before persisting the exact selection.
+        _ = try await api.listFolder(driveId: drive.id, folderId: id, cursor: nil, limit: 5)
+        try await realm.write { realm in
+            realm.object(ofType: Drive.self, forPrimaryKey: drive.id)?.rootFolderId = id
+        }
+    }
+
+    public func existingRootFolder(folderName: String) async throws -> String {
+        guard let drive = try selectedDrive() else { throw PhotoAPIError.invalidResponse }
+        if !drive.rootFolderId.isEmpty { return drive.rootFolderId }
+        let parent = try await ensurePrivateSpace()
+        guard let id = try await findChildDirectory(driveId: drive.id, parentId: parent, name: folderName) else {
+            throw PhotoAPIError.notFound
+        }
+        try await selectRootFolder(id: id)
+        return id
+    }
+
     public func ensureRootFolder(folderName: String) async throws -> String {
         guard let drive = try selectedDrive() else {
             throw PhotoAPIError.invalidResponse
@@ -140,6 +163,10 @@ public final class DriveManagerImpl: DriveManaging {
         //    perdu, install fraîche sur un drive déjà utilisé…), on retombe sur
         //    une lecture pour récupérer son id au lieu de propager le 400.
         let folderId: String
+        if let existing = try await findChildDirectory(driveId: drive.id, parentId: privateId, name: folderName) {
+            try await selectRootFolder(id: existing)
+            return existing
+        }
         do {
             let dto = try await api.createDirectory(
                 driveId: drive.id,
@@ -177,11 +204,12 @@ public final class DriveManagerImpl: DriveManaging {
 
     private static func isDestinationAlreadyExists(_ error: PhotoAPIError) -> Bool {
         guard case .server(let code, _) = error else { return false }
+        // Confirm the folder's existence with a listing instead of depending on private error bodies.
         return code == 400 || code == 409
     }
 
     private func findChildDirectory(driveId: Int, parentId: String, name: String) async throws -> String? {
-        var cursor: String? = nil
+        var cursor: String?
         repeat {
             let page = try await api.listFolder(driveId: driveId, folderId: parentId, cursor: cursor, limit: 100)
             if let match = page.items.first(where: { $0.isDirectory && $0.name == name }) {

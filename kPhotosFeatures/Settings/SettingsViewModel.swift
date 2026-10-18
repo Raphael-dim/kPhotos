@@ -81,19 +81,32 @@ public final class SettingsViewModel: ObservableObject {
 
     /// Définit le dossier racine à partir d'une sélection du FolderPicker
     public func setRootFolder(id: String, name: String) async {
-        rootFolderName = name
-        lastPersistedFolderName = name
         do {
+            try await driveManager.selectRootFolder(id: id)
             try await settingsWriter.update { snapshot in
                 snapshot.rootFolderName = name
             }
-            try await driveManager.resetCachedRootFolders()
+            rootFolderName = name
+            lastPersistedFolderName = name
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
     public func loadDrives() async {
+        errorMessage = nil
+        if let cached = try? driveManager.allDrives(), !cached.isEmpty {
+            let selectedId = (try? driveManager.selectedDrive())?.id
+            drives = cached.map {
+                DriveItem(
+                    id: $0.id,
+                    name: $0.name,
+                    usedSize: $0.usedSize,
+                    totalSize: $0.size,
+                    isSelected: $0.id == selectedId
+                )
+            }
+        }
         isLoading = true
         defer { isLoading = false }
         do {
@@ -113,6 +126,7 @@ public final class SettingsViewModel: ObservableObject {
                 await loadDrives()
             }
         } catch {
+            if error is CancellationError || Task.isCancelled { return }
             errorMessage = error.localizedDescription
         }
     }

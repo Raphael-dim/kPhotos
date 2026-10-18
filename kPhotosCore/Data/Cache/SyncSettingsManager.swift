@@ -96,8 +96,8 @@ public final class SyncSettingsManagerImpl: SyncSettingsManaging {
             token = results.observe { [weak self] change in
                 guard let self else { return }
                 switch change {
-                case .initial(let r), .update(let r, _, _, _):
-                    if let entity = r.first(where: { $0.id == 0 }) {
+                case .initial(let settings), .update(let settings, _, _, _):
+                    if let entity = settings.first(where: { $0.id == 0 }) {
                         subject.send(SyncSettingsSnapshot(entity))
                     }
                 case .error:

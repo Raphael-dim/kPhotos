@@ -32,6 +32,10 @@ public final class Photo: Object {
     @Persisted public var driveId: Int = 0
     @Persisted public var localIdentifier: String = ""
     @Persisted public var name: String = ""
+    @Persisted public var captureDateSource: String = ""
+    @Persisted public var remoteRevision: String = ""
+    @Persisted public var isAvailable: Bool = true
+    @Persisted public var libraryRootId: String = ""
 
     /// Date de prise de vue (PHAsset.creationDate). Source de vérité pour la timeline.
     @Persisted public var takenAt: Date = .init()
@@ -62,6 +66,10 @@ public struct PhotoSnapshot: Identifiable, Equatable, Sendable {
     public let driveId: Int
     public let localIdentifier: String
     public let name: String
+    public var captureDateSource: String = ""
+    public var remoteRevision: String = ""
+    public var isAvailable: Bool = true
+    public var libraryRootId: String = ""
     public let takenAt: Date
     public let uploadedAt: Date
     public let mimeType: String
@@ -71,6 +79,8 @@ public struct PhotoSnapshot: Identifiable, Equatable, Sendable {
     public let albumIds: [String]
     public let syncStatus: PhotoSyncStatus
     public let isFavorite: Bool
+
+    public var hasReliableCaptureDate: Bool { ["photokit", "embedded_offset"].contains(captureDateSource) }
 
     public var fileId: String { id }
 
@@ -121,6 +131,10 @@ public struct PhotoSnapshot: Identifiable, Equatable, Sendable {
             syncStatus: photo.syncStatus,
             isFavorite: photo.isFavorite
         )
+        self.libraryRootId = photo.libraryRootId
+        self.isAvailable = photo.isAvailable
+        self.remoteRevision = photo.remoteRevision
+        self.captureDateSource = photo.captureDateSource
     }
 }
 
