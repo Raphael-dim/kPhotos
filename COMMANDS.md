@@ -12,6 +12,7 @@ The [Makefile](Makefile) is the source of truth. Run commands from the repositor
 | Choose a simulator | `make run-sim SIMULATOR="iPhone 16e"` |
 | Run tests | `make test` |
 | Verify GPL headers, formatting and lint | `make check-headers format-check lint-ci` |
+| Verify the Realm compatibility script without building the app | `make check-realm` |
 | Apply formatting | `make format` |
 | Scan for unused code | `make dead-code` |
 | Scan publishable files for secrets | `make check-secrets` |
