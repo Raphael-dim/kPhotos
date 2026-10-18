@@ -176,7 +176,9 @@ public final class PhotoMapViewModel: ObservableObject {
         for location in localLocations {
             local[location.localIdentifier] = location
         }
-        return photos.compactMap { photo in
+        let pairs = LivePhotoPairing(photos: photos)
+        return photos.filter { !pairs.motionFileIds.contains($0.fileId) }.compactMap { snapshot in
+            let photo = pairs.attachMotion(to: snapshot)
             let fallback = local[photo.localIdentifier].flatMap {
                 MediaCoordinate(latitude: $0.latitude, longitude: $0.longitude)
             }

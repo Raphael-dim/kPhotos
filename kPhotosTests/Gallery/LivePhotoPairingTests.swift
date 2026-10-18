@@ -18,6 +18,7 @@
 
 import Foundation
 @testable import kPhotosCore
+@testable import kPhotosFeatures
 import XCTest
 
 final class LivePhotoPairingTests: XCTestCase {
@@ -60,6 +61,23 @@ final class LivePhotoPairingTests: XCTestCase {
         var motion = photo(id: "motion", name: "one.mov", identifier: identifier, isVideo: true)
         motion.libraryRootId = "another-root"
         XCTAssertTrue(LivePhotoPairing(photos: [still, motion]).motionFileIds.isEmpty)
+    }
+
+    @MainActor
+    func testMapKeepsLivePhotoCompanionAndHidesItsSeparateVideoPoint() {
+        var still = photo(id: "still", name: "photo.heic", identifier: identifier)
+        still.coordinate = MediaCoordinate(latitude: 48, longitude: 2)
+        still.locationSource = "embedded"
+        var motion = photo(id: "motion", name: "photo.mov", identifier: identifier, isVideo: true)
+        motion.coordinate = still.coordinate
+        motion.locationSource = "embedded"
+
+        let points = PhotoMapViewModel.makePoints(photos: [still, motion], localLocations: [])
+
+        XCTAssertEqual(points.map(\.id), [still.id])
+        XCTAssertEqual(points.first?.photo.liveMotionFileId, motion.id)
+        XCTAssertEqual(points.first?.latitude, 48)
+        XCTAssertEqual(points.first?.longitude, 2)
     }
 
     private func items(_ photos: [PhotoSnapshot]) -> [GalleryItem] {
