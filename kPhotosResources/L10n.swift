@@ -55,6 +55,10 @@ public enum L10n {
             }
 
             public enum Tutorial {
+                public static func page(current: Int, total: Int) -> String {
+                    String(format: key("signIn.pat.tutorial.page"), current, total)
+                }
+
                 public static let howTo = key("signIn.pat.tutorial.howTo")
                 public static let title = key("signIn.pat.tutorial.title")
                 public static let step1Title = key("signIn.pat.tutorial.step1.title")

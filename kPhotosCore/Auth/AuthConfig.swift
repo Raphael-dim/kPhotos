@@ -42,7 +42,7 @@ public struct AuthConfig: Equatable {
     /// Default configuration for Infomaniak OAuth.
     ///
     /// `clientId` is a placeholder. Before re-enabling the OAuth sign-in flow
-    /// (see AGENTS.md §20), register an OAuth application at
+    /// (see docs/api/README.md), register an OAuth application at
     /// https://manager.infomaniak.com/v3/profile/api-applications and replace
     /// the placeholder below with the issued client identifier.
     ///

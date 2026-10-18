@@ -44,7 +44,7 @@
 "signIn.pat.tutorial.step4.title" = "API Tokens";
 "signIn.pat.tutorial.step4.body" = "Click \"API Tokens\" to manage your tokens.";
 "signIn.pat.tutorial.step5.title" = "Create the token";
-"signIn.pat.tutorial.step5.body" = "Name it \"Token kPhotos\", set Scopes to \"All\" and Validity to \"Unlimited\", then click Create.";
+"signIn.pat.tutorial.step5.body" = "Name it \"Token kPhotos\", select only the \"drive\" scope, choose a validity period, then click Create.";
 
 // Timeline
 "timeline.title" = "My Photos";
@@ -212,3 +212,5 @@
 
 // Common additional
 "common.create" = "Create";
+
+"signIn.pat.tutorial.page" = "%d / %d";

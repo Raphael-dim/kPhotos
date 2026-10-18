@@ -92,3 +92,19 @@ final class TokenResponseDTOTests: XCTestCase {
         )
     }
 }
+
+final class PATAuthenticationTests: XCTestCase {
+    func testPATWorksWithoutOAuthClientConfiguration() async throws {
+        let storage = InMemoryTokenStorage()
+        let auth = AuthServiceImpl(config: .infomaniak, oauth: OAuth2Client(config: .infomaniak), storage: storage)
+        XCTAssertFalse(AuthConfig.infomaniak.isConfigured)
+        try await auth.acceptPAT("test-only-token-with-no-network-access")
+        let token = try await auth.currentAccessToken()
+        XCTAssertEqual(token, "test-only-token-with-no-network-access")
+        try await auth.signOut()
+        do {
+            _ = try await auth.currentAccessToken()
+            XCTFail("Sign out must clear the token")
+        } catch { XCTAssertEqual(error as? AuthError, .noTokenStored) }
+    }
+}

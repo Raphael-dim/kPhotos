@@ -95,7 +95,7 @@ private struct TokenTutorialView: View {
 
     private func stepPage(index: Int, step: TutorialStep) -> some View {
         VStack(spacing: 20) {
-            Text("\(index + 1) / \(steps.count)")
+            Text(L10n.SignIn.PAT.Tutorial.page(current: index + 1, total: steps.count))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
 

@@ -66,15 +66,15 @@ struct TokenResponseDTO: Decodable {
     }
 
     init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.accessToken = try c.decode(String.self, forKey: .accessToken)
-        self.tokenType = try c.decodeIfPresent(String.self, forKey: .tokenType)
-        self.expiresIn = try c.decodeIfPresent(Int.self, forKey: .expiresIn)
-        self.refreshToken = try c.decodeIfPresent(String.self, forKey: .refreshToken)
-        self.scope = try c.decodeIfPresent(String.self, forKey: .scope)
-        if let intId = try? c.decodeIfPresent(Int.self, forKey: .userId) {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.accessToken = try container.decode(String.self, forKey: .accessToken)
+        self.tokenType = try container.decodeIfPresent(String.self, forKey: .tokenType)
+        self.expiresIn = try container.decodeIfPresent(Int.self, forKey: .expiresIn)
+        self.refreshToken = try container.decodeIfPresent(String.self, forKey: .refreshToken)
+        self.scope = try container.decodeIfPresent(String.self, forKey: .scope)
+        if let intId = try? container.decodeIfPresent(Int.self, forKey: .userId) {
             self.userId = intId
-        } else if let stringId = try? c.decodeIfPresent(String.self, forKey: .userId) {
+        } else if let stringId = try? container.decodeIfPresent(String.self, forKey: .userId) {
             self.userId = Int(stringId)
         } else {
             self.userId = nil

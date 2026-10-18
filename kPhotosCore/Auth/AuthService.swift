@@ -68,9 +68,10 @@ public final class AuthServiceImpl: AuthService {
     }
 
     public func currentAccessToken() async throws -> String {
-        guard config.isConfigured else { throw AuthError.notConfigured }
         guard let token = try storage.load() else { throw AuthError.noTokenStored }
+        // PAT authentication does not depend on an OAuth client registration.
         if !token.isExpiring() { return token.accessToken }
+        guard config.isConfigured else { throw AuthError.notConfigured }
         let refreshed = try await refreshIfNeeded(token)
         return refreshed.accessToken
     }

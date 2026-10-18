@@ -26,9 +26,9 @@ public struct PKCEChallenge: Equatable {
     public let method = "S256"
 
     public init(verifier: String? = nil) {
-        let v = verifier ?? Self.makeVerifier()
-        self.verifier = v
-        self.challenge = Self.challenge(for: v)
+        let verifier = verifier ?? Self.makeVerifier()
+        self.verifier = verifier
+        self.challenge = Self.challenge(for: verifier)
     }
 
     static func makeVerifier(length: Int = 64) -> String {
