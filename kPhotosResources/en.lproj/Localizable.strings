@@ -350,3 +350,17 @@
 "viewer.info.type.photo" = "Photo";
 
 "viewer.info.type.video" = "Video";
+
+"viewer.live.motion" = "Play Live";
+
+"viewer.live.still" = "Photo";
+
+"viewer.live.unavailable" = "This Live Photo’s motion could not be played.";
+
+"viewer.info.fallbackDate" = "Fallback date";
+
+"viewer.info.fallbackDateExplanation" = "Capture date unconfirmed. The timeline uses a kDrive file date.";
+
+"viewer.info.embeddedLocalDate" = "Capture (local EXIF time)";
+
+"viewer.info.embeddedLocalDateExplanation" = "The file does not specify its time zone. The EXIF wall clock is preserved; UTC conversion remains uncertain.";

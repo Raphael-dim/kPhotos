@@ -74,8 +74,6 @@ public final class TimelineViewModel: ObservableObject {
     @InjectService private var deletionEngine: PhotoDeleting
     @InjectService private var photoLibraryObserver: PhotoLibraryObserving
     @InjectService private var syncSettings: SyncSettingsReading
-    @InjectService private var api: PhotoApiFetching
-    @InjectService private var photoWriter: PhotoWriting
     @InjectService private var albumManager: AlbumManaging
     @InjectService private var downloader: MediaDownloading
 
@@ -334,7 +332,17 @@ public final class TimelineViewModel: ObservableObject {
     /// disponible côté kDrive, meilleure qualité que la vignette PhotoKit).
     public var orderedViewerMedia: [ViewerMedia] {
         guard case .ready(_, let sections) = state else { return [] }
-        return sections.flatMap(\.items).compactMap(viewerMedia(for:))
+        // Resolve the full pager in linear time; repeated array searches freeze large libraries on tap.
+        let cloudById = Dictionary(cloudPhotos.map { ($0.fileId, $0) }, uniquingKeysWith: { _, last in last })
+        let livePairs = LivePhotoPairing(photos: cloudPhotos)
+        let localById = Dictionary(localAssets.map { ($0.localIdentifier, $0) }, uniquingKeysWith: { _, last in last })
+        return sections.flatMap(\.items).compactMap { item in
+            if let fileId = item.cloudFileId, let photo = cloudById[fileId] {
+                return .cloud(livePairs.attachMotion(to: photo))
+            }
+            if let localId = item.localAssetIdentifier, let asset = localById[localId] { return .local(asset) }
+            return nil
+        }
     }
 
     /// Convertit un `GalleryItem` en `ViewerMedia` ouvrable. Précédence : cloud
@@ -351,7 +359,7 @@ public final class TimelineViewModel: ObservableObject {
     public func viewerMedia(for item: GalleryItem) -> ViewerMedia? {
         if let fileId = item.cloudFileId,
            let snapshot = cloudPhotos.first(where: { $0.fileId == fileId }) {
-            return .cloud(snapshot)
+            return .cloud(LivePhotoPairing(photos: cloudPhotos).attachMotion(to: snapshot))
         }
         if let localId = item.localAssetIdentifier,
            let asset = localAssets.first(where: { $0.localIdentifier == localId }) {
@@ -552,10 +560,14 @@ public final class TimelineViewModel: ObservableObject {
     /// On teste les deux pour ne rater aucune photo sélectionnée.
     public var selectedPhotos: [PhotoSnapshot] {
         let ids = selectionManager.selectedIds
+        let livePairs = LivePhotoPairing(photos: cloudPhotos)
         return cloudPhotos.filter {
-            ids.contains(GalleryItem.cloudOnlyID(fileId: $0.fileId)) ||
-                (!$0.localIdentifier.isEmpty && ids.contains($0.localIdentifier))
-        }
+            !livePairs.motionFileIds.contains($0.fileId)
+                && (
+                    ids.contains(GalleryItem.cloudOnlyID(fileId: $0.fileId))
+                        || (!$0.localIdentifier.isEmpty && ids.contains($0.localIdentifier))
+                )
+        }.map { livePairs.attachMotion(to: $0) }
     }
 
     public func loadAlbums() async -> [AlbumSnapshot] {

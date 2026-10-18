@@ -447,6 +447,7 @@ private struct PhotoLocationSheet: View {
                                     .aspectRatio(1, contentMode: .fit)
                             }
                             .buttonStyle(.plain)
+                            .mediaViewerSource(id: ViewerMedia.cloud(photo).id, in: viewerNamespace)
                         }
                     }
                     .padding(.horizontal, 4)
@@ -470,6 +471,9 @@ private struct PhotoLocationSheet: View {
                 media: presentation.photos.map(ViewerMedia.cloud),
                 initialIndex: presentation.index,
                 namespace: viewerNamespace,
+                onCurrentMediaChange: { mediaID in
+                    currentFileID = presentation.photos.first { ViewerMedia.cloud($0).id == mediaID }?.fileId
+                },
                 onClose: { viewerPresentation = nil }
             )
         }

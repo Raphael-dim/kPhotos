@@ -244,11 +244,6 @@ final class ThumbnailCache {
         ImageDiskBudget.store(data, at: url, limit: 512 * 1024 * 1024)
     }
 
-    func diskData(forKey key: String) -> Data? {
-        guard let url = diskURL(for: key) else { return nil }
-        return try? Data(contentsOf: url)
-    }
-
     private func diskURL(for key: String) -> URL? {
         guard let dir = diskDirectory else { return nil }
         // Sanitize : le `key` est composé de chiffres + dash, mais on reste prudent.
@@ -308,11 +303,6 @@ final class PreviewCache {
     func storeOnDisk(_ data: Data, forKey key: String) {
         guard let url = diskURL(for: key) else { return }
         ImageDiskBudget.store(data, at: url, limit: 256 * 1024 * 1024)
-    }
-
-    func diskData(forKey key: String) -> Data? {
-        guard let url = diskURL(for: key) else { return nil }
-        return try? Data(contentsOf: url)
     }
 
     private func diskURL(for key: String) -> URL? {

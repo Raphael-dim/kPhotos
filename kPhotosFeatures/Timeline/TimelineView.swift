@@ -56,6 +56,7 @@ private struct ViewerPresentation: Identifiable {
     let id = UUID()
     let media: [ViewerMedia]
     let index: Int
+    let galleryItemIDs: [String: String]
 }
 
 /// Notification in-app affichée brièvement (toast) à la fin d'une synchronisation.
@@ -94,6 +95,7 @@ public struct TimelineView: View {
     @State private var isShowingBackupDetails = false
     @Environment(\.scenePhase) private var scenePhase
     @State private var viewerPresentation: ViewerPresentation?
+    @State private var viewerGalleryItemID: String?
     @Namespace private var viewerNamespace
     @State private var navigationTitle = L10n.Timeline.title
     /// Index du niveau de densité courant dans `Self.zoomLevels`. La grille a un
@@ -207,6 +209,9 @@ public struct TimelineView: View {
                         media: presentation.media,
                         initialIndex: presentation.index,
                         namespace: viewerNamespace,
+                        onCurrentMediaChange: { mediaID in
+                            viewerGalleryItemID = presentation.galleryItemIDs[mediaID]
+                        },
                         onClose: { viewerPresentation = nil }
                     )
                 }
@@ -517,11 +522,6 @@ public struct TimelineView: View {
         }
     }
 
-    private var isSyncing: Bool {
-        if case .running = viewModel.syncState { return true }
-        return false
-    }
-
     @ViewBuilder private var content: some View {
         switch viewModel.state {
         case .loading:
@@ -672,7 +672,16 @@ public struct TimelineView: View {
                     .onPreferenceChange(ScrollFramePreferenceKey.self) { frame in
                         scrollViewGlobalFrame = frame
                     }
-
+                    .onChange(of: viewerGalleryItemID) { itemID in
+                        guard let itemID else { return }
+                        let frame = tileFrames[itemID] ?? .zero
+                        if frame.isEmpty || !scrollViewGlobalFrame.contains(frame) {
+                            // Mount the current thumbnail before the interactive return transition begins.
+                            var transaction = Transaction()
+                            transaction.disablesAnimations = true
+                            withTransaction(transaction) { scrollProxy.scrollTo(itemID, anchor: .center) }
+                        }
+                    }
                     .onAppear { scrollViewGlobalFrame = proxy.frame(in: .global) }
                     .onDisappear {
                         stopAutoScroll()
@@ -757,7 +766,13 @@ public struct TimelineView: View {
             guard let media = viewModel.viewerMedia(for: item) else { return }
             let allMedia = viewModel.orderedViewerMedia
             let index = allMedia.firstIndex(where: { $0.id == media.id }) ?? 0
-            viewerPresentation = ViewerPresentation(media: allMedia, index: index)
+            guard case .ready(_, let sections) = viewModel.state else { return }
+            let galleryItemIDs = Dictionary(
+                sections.flatMap(\.items).map { ($0.viewerTransitionID, $0.id) },
+                uniquingKeysWith: { first, _ in first }
+            )
+            viewerGalleryItemID = nil
+            viewerPresentation = ViewerPresentation(media: allMedia, index: index, galleryItemIDs: galleryItemIDs)
         }
     }
 
@@ -1239,7 +1254,6 @@ struct GalleryTile: View {
         ZStack(alignment: .bottomLeading) {
             Color(uiColor: .secondarySystemBackground)
                 .frame(width: size, height: size)
-                .matchedGeometryEffect(id: matchedId, in: namespace)
 
             thumbnail
 
@@ -1255,6 +1269,7 @@ struct GalleryTile: View {
         .frame(width: size, height: size)
         .clipped()
         .contentShape(Rectangle())
+        .mediaViewerSource(id: item.viewerTransitionID, in: namespace)
         .background(
             GeometryReader { geo in
                 Color.clear.preference(
@@ -1306,11 +1321,6 @@ struct GalleryTile: View {
             return { onShowDeletionFailure(fileId, reason) }
         }
         return nil
-    }
-
-    private var matchedId: String {
-        if let fileId = item.cloudFileId { return "photo-\(fileId)" }
-        return "local-\(item.id)"
     }
 
     @ViewBuilder private var thumbnail: some View {

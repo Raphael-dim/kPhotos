@@ -121,8 +121,9 @@ public final class GalleryComposerImpl: GalleryComposing {
         deletionItems: [String: DeletionItemSnapshot],
         uploadStates: [String: UploadState]
     ) -> [GalleryItem] {
+        let livePairs = LivePhotoPairing(photos: cloudPhotos)
         var cloudByLocalId: [String: PhotoSnapshot] = [:]
-        for photo in cloudPhotos where !photo.localIdentifier.isEmpty {
+        for photo in cloudPhotos where !photo.localIdentifier.isEmpty && !livePairs.motionFileIds.contains(photo.fileId) {
             cloudByLocalId[photo.localIdentifier] = photo
         }
         var localIdsCovered = Set<String>()
@@ -158,7 +159,7 @@ public final class GalleryComposerImpl: GalleryComposing {
             items.append(item)
         }
 
-        for cloud in cloudPhotos {
+        for cloud in cloudPhotos where !livePairs.motionFileIds.contains(cloud.fileId) {
             if !cloud.localIdentifier.isEmpty, localIdsCovered.contains(cloud.localIdentifier) {
                 continue
             }

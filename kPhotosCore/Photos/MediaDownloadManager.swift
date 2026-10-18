@@ -110,7 +110,34 @@ public final class MediaDownloadManager: MediaDownloading {
     // MARK: Private – Download
 
     private func downloadAndSave(photo: PhotoSnapshot) async throws {
-        let downloadURL = api.downloadURL(driveId: photo.driveId, fileId: photo.fileId)
+        let stillURL = try await downloadOriginal(
+            driveId: photo.driveId,
+            fileId: photo.fileId,
+            name: photo.name,
+            isVideo: photo.isVideo
+        )
+        defer { try? fileManager.removeItem(at: stillURL) }
+        if let motionId = photo.liveMotionFileId, let motionName = photo.liveMotionName, !photo.isVideo {
+            let motionURL = try await downloadOriginal(
+                driveId: photo.driveId,
+                fileId: motionId,
+                name: motionName,
+                isVideo: true
+            )
+            defer { try? fileManager.removeItem(at: motionURL) }
+            let stillId = EmbeddedMediaMetadata.image(url: stillURL)?.livePhotoContentIdentifier
+            let motionId = try await EmbeddedMediaMetadata.video(url: motionURL).livePhotoContentIdentifier
+            guard let stillId, stillId == motionId, stillId == photo.liveContentIdentifier else {
+                throw MediaDownloadError.importFailed
+            }
+            try await importToPhotoLibrary(fileURL: stillURL, mediaType: .image, pairedVideoURL: motionURL)
+        } else {
+            try await importToPhotoLibrary(fileURL: stillURL, mediaType: photo.isVideo ? .video : .image)
+        }
+    }
+
+    private func downloadOriginal(driveId: Int, fileId: String, name: String, isVideo: Bool) async throws -> URL {
+        let downloadURL = api.downloadURL(driveId: driveId, fileId: fileId)
         let token = try await auth.currentAccessToken()
 
         // Requête authentifiée.
@@ -131,29 +158,35 @@ public final class MediaDownloadManager: MediaDownloading {
 
         // Renomme le fichier temporaire avec l'extension correcte : PhotoKit en a
         // besoin pour reconnaître le type (JPEG, HEIC, MP4…).
-        let ext = (photo.name as NSString).pathExtension
-        let destExt = ext.isEmpty ? (photo.isVideo ? "mp4" : "jpg") : ext
+        let ext = (name as NSString).pathExtension
+        let destExt = ext.isEmpty ? (isVideo ? "mp4" : "jpg") : ext
         let destURL = fileManager.temporaryDirectory
             .appendingPathComponent(UUID().uuidString)
             .appendingPathExtension(destExt)
 
         try fileManager.moveItem(at: tmpURL, to: destURL)
-
-        do {
-            try await importToPhotoLibrary(
-                fileURL: destURL,
-                mediaType: photo.isVideo ? .video : .image
-            )
-        } catch {
-            try? fileManager.removeItem(at: destURL)
-            throw error
+        if !isVideo, let type = EmbeddedMediaMetadata.image(url: destURL)?.detectedImageType {
+            let actualExtension: String? = switch type {
+            case "public.jpeg": "jpg"
+            case "public.heic": "heic"
+            default: nil
+            }
+            if let actualExtension, actualExtension.caseInsensitiveCompare(destExt) != .orderedSame {
+                let correctedURL = destURL.deletingPathExtension().appendingPathExtension(actualExtension)
+                try fileManager.moveItem(at: destURL, to: correctedURL)
+                return correctedURL
+            }
         }
-        // shouldMoveFile=true → PhotoKit a pris possession du fichier, pas de cleanup.
+        return destURL
     }
 
     // MARK: Private – Import
 
-    private func importToPhotoLibrary(fileURL: URL, mediaType: PHAssetMediaType) async throws {
+    private func importToPhotoLibrary(
+        fileURL: URL,
+        mediaType: PHAssetMediaType,
+        pairedVideoURL: URL? = nil
+    ) async throws {
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             PHPhotoLibrary.shared().performChanges({
                 let options = PHAssetResourceCreationOptions()
@@ -164,6 +197,9 @@ public final class MediaDownloadManager: MediaDownloading {
                 switch mediaType {
                 case .image:
                     req.addResource(with: .photo, fileURL: fileURL, options: options)
+                    if let pairedVideoURL {
+                        req.addResource(with: .pairedVideo, fileURL: pairedVideoURL, options: options)
+                    }
                 case .video:
                     req.addResource(with: .video, fileURL: fileURL, options: options)
                 default:

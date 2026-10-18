@@ -371,6 +371,9 @@ public enum L10n {
     }
 
     public enum Viewer {
+        public static let liveMotion = key("viewer.live.motion")
+        public static let liveStill = key("viewer.live.still")
+        public static let liveMotionUnavailable = key("viewer.live.unavailable")
         public static let addToAlbum = key("viewer.addToAlbum")
         public static let saveToLibrary = key("viewer.saveToLibrary")
         public static let saveToLibrarySuccess = key("viewer.saveToLibrarySuccess")
@@ -381,8 +384,8 @@ public enum L10n {
         public static let selectAlbumTitle = key("viewer.selectAlbum.title")
 
         public enum Info {
-            public static let photoType = key("viewer.info.type.photo")
-            public static let videoType = key("viewer.info.type.video")
+            public static var embeddedLocalDate: String { key("viewer.info.embeddedLocalDate") }
+            public static var embeddedLocalDateExplanation: String { key("viewer.info.embeddedLocalDateExplanation") }
             public static let title = key("viewer.info.title")
             public static let fileSection = key("viewer.info.file.section")
             public static let dateSection = key("viewer.info.date.section")
@@ -393,8 +396,12 @@ public enum L10n {
             public static let name = key("viewer.info.name")
             public static let size = key("viewer.info.size")
             public static let type = key("viewer.info.type")
+            public static let photoType = key("viewer.info.type.photo")
+            public static let videoType = key("viewer.info.type.video")
             public static let resolution = key("viewer.info.resolution")
             public static let takenAt = key("viewer.info.takenAt")
+            public static let fallbackDate = key("viewer.info.fallbackDate")
+            public static let fallbackDateExplanation = key("viewer.info.fallbackDateExplanation")
             public static let addedAt = key("viewer.info.addedAt")
             public static let duration = key("viewer.info.duration")
             public static let make = key("viewer.info.make")

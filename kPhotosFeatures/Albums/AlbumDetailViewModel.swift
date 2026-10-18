@@ -41,7 +41,10 @@ public final class AlbumDetailViewModel: ObservableObject {
             // Pull du serveur pour rafraîchir les `Photo.albumIds` puis lecture locale.
             try await albums.refreshAlbumPhotos(albumId: album.id, driveId: album.driveId)
             let allPhotos = try photosReader.allPhotos()
-            photos = allPhotos.filter { $0.albumIds.contains(album.id) }
+            let members = allPhotos.filter { $0.driveId == album.driveId && $0.isAvailable && $0.albumIds.contains(album.id) }
+            let livePairs = LivePhotoPairing(photos: members)
+            photos = members.filter { !livePairs.motionFileIds.contains($0.fileId) }
+                .map { livePairs.attachMotion(to: $0) }
             errorMessage = nil
         } catch {
             errorMessage = error.localizedDescription
@@ -52,7 +55,11 @@ public final class AlbumDetailViewModel: ObservableObject {
         let trimmed = fileId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         do {
-            try await albums.addPhotos(fileIds: [trimmed], toAlbumId: album.id, driveId: album.driveId)
+            let allPhotos = try photosReader.allPhotos().filter { $0.driveId == album.driveId }
+            let pair = LivePhotoPairing(photos: allPhotos).motionByStillId[trimmed]
+            try await albums.addPhotos(
+                fileIds: [trimmed, pair?.fileId].compactMap { $0 }, toAlbumId: album.id, driveId: album.driveId
+            )
             await load()
         } catch {
             errorMessage = error.localizedDescription
@@ -62,8 +69,12 @@ public final class AlbumDetailViewModel: ObservableObject {
     public func removePhoto(fileId: String) async {
         do {
             try await albums.removePhoto(fileId: fileId, fromAlbumId: album.id, driveId: album.driveId)
+            if let motionId = photos.first(where: { $0.fileId == fileId })?.liveMotionFileId {
+                try await albums.removePhoto(fileId: motionId, fromAlbumId: album.id, driveId: album.driveId)
+            }
             await load()
         } catch {
+            await load()
             errorMessage = error.localizedDescription
         }
     }

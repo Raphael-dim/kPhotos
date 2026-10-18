@@ -351,3 +351,17 @@
 "viewer.info.type.photo" = "Photo";
 
 "viewer.info.type.video" = "Vidéo";
+
+"viewer.live.motion" = "Animer";
+
+"viewer.live.still" = "Photo";
+
+"viewer.live.unavailable" = "Impossible de lire l’animation de cette Live Photo.";
+
+"viewer.info.fallbackDate" = "Date de repli";
+
+"viewer.info.fallbackDateExplanation" = "Date de prise de vue non confirmée. Le classement utilise une date du fichier kDrive.";
+
+"viewer.info.embeddedLocalDate" = "Prise de vue (heure EXIF locale)";
+
+"viewer.info.embeddedLocalDateExplanation" = "Le fichier ne précise pas le fuseau horaire. L’heure EXIF est conservée ; la conversion UTC reste incertaine.";
