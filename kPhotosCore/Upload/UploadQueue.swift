@@ -29,14 +29,24 @@ public enum UploadState: Equatable, Sendable {
 }
 
 public protocol UploadQueueReading: AnyObject {
+    var currentScope: String? { get }
     /// État courant indexé par `PHAsset.localIdentifier`.
     var statesPublisher: AnyPublisher<[String: UploadState], Never> { get }
     var currentStates: [String: UploadState] { get }
 }
 
+public extension UploadQueueReading {
+    var currentScope: String? { nil }
+}
+
 public protocol UploadQueueWriting: AnyObject {
+    func beginScope(driveId: Int, rootId: String)
     func mark(localIdentifier: String, state: UploadState)
     func clearCompleted()
+}
+
+public extension UploadQueueWriting {
+    func beginScope(driveId: Int, rootId: String) {}
 }
 
 public typealias UploadQueueing = UploadQueueReading & UploadQueueWriting
@@ -48,6 +58,7 @@ public typealias UploadQueueing = UploadQueueReading & UploadQueueWriting
 public final class UploadQueueImpl: UploadQueueing {
     private let lock = NSLock()
     private var states: [String: UploadState] = [:]
+    private var scope: String?
     private let subject = CurrentValueSubject<[String: UploadState], Never>([:])
 
     public init() {}
@@ -60,6 +71,22 @@ public final class UploadQueueImpl: UploadQueueing {
         lock.lock()
         defer { lock.unlock() }
         return states
+    }
+
+    public var currentScope: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return scope
+    }
+
+    public func beginScope(driveId: Int, rootId: String) {
+        lock.lock()
+        let requested = "\(driveId):\(rootId)"
+        if scope != requested { states = [:] }
+        scope = requested
+        let snapshot = states
+        lock.unlock()
+        subject.send(snapshot)
     }
 
     public func mark(localIdentifier: String, state: UploadState) {

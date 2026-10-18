@@ -307,6 +307,33 @@ final class GalleryComposerTests: XCTestCase {
         XCTAssertEqual(sections[0].items.count, 1)
     }
 
+    func testUnverifiedCloudFileAndCompletedQueueDoNotClaimCompleteBackup() {
+        let asset = LocalAssetSnapshot(localIdentifier: "L", takenAt: date("2024-06-15"), isVideo: false)
+        var cloud = photo(fileId: "F", localId: "L", date: asset.takenAt)
+        cloud.backupComplete = false
+        let sections = composer.compose(
+            localAssets: [asset],
+            cloudPhotos: [cloud],
+            backupItems: ["L": backupItem(localId: "L", state: .completed)],
+            uploadStates: [:],
+            calendar: cal
+        )
+        XCTAssertEqual(sections[0].items[0].syncState, .localOnly)
+    }
+
+    func testEditedLocalAssetRequiresAnotherVerifiedBackup() {
+        let asset = LocalAssetSnapshot(
+            localIdentifier: "L",
+            takenAt: date("2024-06-15"),
+            isVideo: false,
+            modifiedAt: date("2024-07-15")
+        )
+        var cloud = photo(fileId: "F", localId: "L", date: asset.takenAt)
+        cloud.localModifiedAt = date("2024-06-15")
+        let sections = composer.compose(localAssets: [asset], cloudPhotos: [cloud], uploadStates: [:], calendar: cal)
+        XCTAssertEqual(sections[0].items[0].syncState, .localOnly)
+    }
+
     // MARK: - Helpers
 
     private func date(_ iso: String) -> Date {
@@ -321,7 +348,7 @@ final class GalleryComposerTests: XCTestCase {
         date: Date,
         status: PhotoSyncStatus = .synced
     ) -> PhotoSnapshot {
-        PhotoSnapshot(
+        var snapshot = PhotoSnapshot(
             id: fileId,
             driveId: 1,
             localIdentifier: localId,
@@ -336,6 +363,8 @@ final class GalleryComposerTests: XCTestCase {
             syncStatus: status,
             isFavorite: false
         )
+        snapshot.backupComplete = true
+        return snapshot
     }
 
     private func backupItem(

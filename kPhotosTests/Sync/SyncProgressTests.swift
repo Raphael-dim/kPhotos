@@ -27,15 +27,23 @@ final class SyncProgressTests: XCTestCase {
     func testFraction_halfway() {
         XCTAssertEqual(
             SyncProgress(completed: 5, total: 10, lastUploadedFileName: nil).fraction,
-            0.5, accuracy: 0.001
+            0.5,
+            accuracy: 0.001
         )
     }
 
     func testFraction_complete() {
         XCTAssertEqual(
             SyncProgress(completed: 10, total: 10, lastUploadedFileName: nil).fraction,
-            1.0, accuracy: 0.001
+            1.0,
+            accuracy: 0.001
         )
+    }
+
+    func testFractionCountsProcessedFailuresWithoutCountingThemAsUploads() {
+        let progress = SyncProgress(completed: 0, total: 10, lastUploadedFileName: nil, processed: 5)
+        XCTAssertEqual(progress.fraction, 0.5, accuracy: 0.001)
+        XCTAssertEqual(progress.completed, 0)
     }
 }
 

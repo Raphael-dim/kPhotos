@@ -16,6 +16,7 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import Combine
 import Foundation
 import Photos
 
@@ -51,12 +52,14 @@ public struct LocalAssetSnapshot: Identifiable, Equatable, Sendable {
     public let localIdentifier: String
     public let takenAt: Date
     public let isVideo: Bool
+    public var modifiedAt: Date?
 
-    public init(localIdentifier: String, takenAt: Date, isVideo: Bool) {
+    public init(localIdentifier: String, takenAt: Date, isVideo: Bool, modifiedAt: Date? = nil) {
         self.id = localIdentifier
         self.localIdentifier = localIdentifier
         self.takenAt = takenAt
         self.isVideo = isVideo
+        self.modifiedAt = modifiedAt
     }
 }
 
@@ -167,7 +170,8 @@ public final class PHAssetReaderImpl: PHAssetReading {
             snapshots.append(LocalAssetSnapshot(
                 localIdentifier: asset.localIdentifier,
                 takenAt: date,
-                isVideo: asset.mediaType == .video
+                isVideo: asset.mediaType == .video,
+                modifiedAt: asset.modificationDate
             ))
         }
         return snapshots
@@ -216,6 +220,7 @@ public final class PHAssetReaderImpl: PHAssetReading {
 /// Comportement Google Photos : tu prends une photo, le badge "en attente" apparaît
 /// à la seconde, l'upload démarre au prochain coup de moteur (sync manuelle ou BG).
 public protocol PhotoLibraryObserving: AnyObject {
+    var changesPublisher: AnyPublisher<Void, Never> { get }
     /// Démarre l'observation. Idempotent — appels multiples sont sans effet après
     /// le premier. Exige que l'autorisation photothèque soit accordée (sinon no-op).
     func startObserving()
@@ -231,7 +236,13 @@ public protocol PhotoLibraryObserving: AnyObject {
     func restart()
 }
 
+public extension PhotoLibraryObserving {
+    var changesPublisher: AnyPublisher<Void, Never> { Empty().eraseToAnyPublisher() }
+}
+
 public final class PhotoLibraryObserverImpl: NSObject, PhotoLibraryObserving, PHPhotoLibraryChangeObserver {
+    private let changes = PassthroughSubject<Void, Never>()
+    public var changesPublisher: AnyPublisher<Void, Never> { changes.eraseToAnyPublisher() }
     private let backupQueueWriter: BackupQueueWriting
     private let settings: SyncSettingsReading
 
@@ -296,6 +307,7 @@ public final class PhotoLibraryObserverImpl: NSObject, PhotoLibraryObserving, PH
         let removed: [PHAsset] = details.removedObjects
 
         trackedAssets = details.fetchResultAfterChanges
+        changes.send(())
 
         if !inserted.isEmpty {
             Task { [backupQueueWriter] in

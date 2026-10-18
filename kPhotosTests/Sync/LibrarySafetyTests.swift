@@ -125,6 +125,20 @@ final class LibrarySafetyTests: XCTestCase {
         XCTAssertEqual(keeper.objects(Photo.self).count, 1)
     }
 
+    func testMissingCompanionInvalidatesBackupWithoutDiscardingMetadata() async throws {
+        let accessor = RealmAccessorImpl(configuration: .inMemoryKPhotos)
+        let keeper = try keepRealm(accessor.configuration)
+        let manager = PhotoManagerImpl(realm: accessor)
+        var saved = PhotoSyncEngine.makeSnapshot(from: file("image"), driveId: 7)
+        saved.libraryRootId = "root"; saved.backupComplete = true; saved.resourceFileIds = ["image", "motion", "metadata"]
+        try await manager.upsert(saved)
+        try await manager.commitListing([saved], driveId: 7, folderId: "root", fileIds: ["image", "metadata"], revisions: [:])
+        let retained = try XCTUnwrap(manager.photo(byFileId: "image"))
+        XCTAssertFalse(retained.backupComplete)
+        XCTAssertEqual(retained.resourceFileIds, ["image", "motion", "metadata"])
+        _ = keeper
+    }
+
     func testExactSelectedFolderIsResolvedWithoutLookingUpItsName() async throws {
         let accessor = RealmAccessorImpl(configuration: .inMemoryKPhotos)
         let keeper = try keepRealm(accessor.configuration)
@@ -140,8 +154,175 @@ final class LibrarySafetyTests: XCTestCase {
         _ = keeper
     }
 
+    func testIdenticalMacUploadIsReusedWithoutSendingAnotherCopy() async throws {
+        let api = LibraryTestAPI(); api.downloads["mac"] = Data("original".utf8)
+        let resource = try localResource("original")
+        defer { try? FileManager.default.removeItem(at: resource.fileURL) }
+        var candidate = PhotoSyncEngine.makeSnapshot(from: file("mac", size: 8), driveId: 7)
+        candidate.libraryRootId = "root"
+        let result = try await ResourceBackup(api: api).findOrUpload(
+            resource: resource,
+            date: Date(),
+            token: "test",
+            localIdentifier: "local-photo",
+            driveId: 7,
+            folderId: "root",
+            candidates: [candidate]
+        )
+        XCTAssertEqual(result.0.id, "mac"); XCTAssertEqual(api.uploads, 0)
+    }
+
+    func testExistingDestinationFileIsVerifiedWithoutFullLibraryScan() async throws {
+        let api = LibraryTestAPI()
+        api.pages["root:"] = FilePage(items: [file("existing", name: "test.jpg", size: 8)], nextCursor: nil)
+        api.downloads["existing"] = Data("original".utf8)
+        let resource = try localResource("original")
+        defer { try? FileManager.default.removeItem(at: resource.fileURL) }
+
+        let result = try await ResourceBackup(api: api).findOrUpload(
+            resource: resource,
+            date: Date(),
+            token: "retry",
+            localIdentifier: "local-photo",
+            driveId: 7,
+            folderId: "root",
+            candidates: []
+        )
+
+        XCTAssertEqual(result.0.id, "existing")
+        XCTAssertEqual(api.uploads, 0)
+        XCTAssertEqual(api.listingRequests, ["root:"])
+    }
+
+    func testBatchReconcilePreservesKnownItemsAndQueuesOnlyMissingAssets() async throws {
+        let accessor = RealmAccessorImpl(configuration: .inMemoryKPhotos)
+        let keeper = try keepRealm(accessor.configuration)
+        let manager = PhotoManagerImpl(realm: accessor)
+        let date = Date(timeIntervalSince1970: 1000)
+        for identifier in ["synced", "stale", "skipped"] {
+            try await manager.enqueueIfAbsent(localIdentifier: identifier, creationDate: date, isVideo: false)
+        }
+        try await manager.markCompleted(localIdentifier: "synced")
+        try await manager.markCompleted(localIdentifier: "stale")
+        try await manager.markSkipped(localIdentifier: "skipped", reason: "User skipped")
+        let staleToken = try XCTUnwrap(manager.item(localIdentifier: "stale")?.clientToken)
+
+        let assets = ["synced", "stale", "skipped", "new"].map {
+            LocalAssetSnapshot(localIdentifier: $0, takenAt: date, isVideo: $0 == "new")
+        }
+        try await manager.reconcile(localAssets: assets, syncedIdentifiers: ["synced"])
+        try await manager.reconcile(localAssets: assets, syncedIdentifiers: ["synced"])
+
+        XCTAssertEqual(try manager.allItems().count, 4)
+        XCTAssertEqual(try manager.item(localIdentifier: "synced")?.state, .completed)
+        XCTAssertEqual(try manager.item(localIdentifier: "stale")?.state, .queued)
+        XCTAssertEqual(try manager.item(localIdentifier: "stale")?.clientToken, staleToken)
+        XCTAssertEqual(try manager.item(localIdentifier: "skipped")?.state, .skipped)
+        XCTAssertEqual(try manager.item(localIdentifier: "new")?.state, .queued)
+        XCTAssertEqual(try manager.item(localIdentifier: "new")?.isVideo, true)
+        _ = keeper
+    }
+
+    func testIdenticalBytesLinkedToAnotherLocalAssetGetTheirOwnCloudFile() async throws {
+        let api = LibraryTestAPI()
+        api.downloads["first"] = Data("original".utf8)
+        api.pages["root:"] = FilePage(items: [], nextCursor: nil)
+        let resource = try localResource("original")
+        defer { try? FileManager.default.removeItem(at: resource.fileURL) }
+        var candidate = PhotoSnapshot(
+            id: "first",
+            driveId: 7,
+            localIdentifier: "first-local",
+            name: "first.jpg",
+            takenAt: Date(),
+            uploadedAt: Date(),
+            mimeType: "image/jpeg",
+            size: 8,
+            isVideo: false,
+            duration: 0,
+            albumIds: [],
+            syncStatus: .synced,
+            isFavorite: false
+        )
+        candidate.libraryRootId = "root"
+
+        let result = try await ResourceBackup(api: api).findOrUpload(
+            resource: resource,
+            date: Date(),
+            token: "second-token",
+            localIdentifier: "second-local",
+            driveId: 7,
+            folderId: "root",
+            candidates: [candidate]
+        )
+
+        XCTAssertEqual(result.0.id, "upload-1")
+        XCTAssertEqual(api.uploads, 1)
+        XCTAssertFalse(api.downloadRequests.contains("first"))
+    }
+
+    func testSameSizeDifferentBytesDoesNotCountAsDuplicate() async throws {
+        let api = LibraryTestAPI(); api.downloads["mac"] = Data("different".utf8)
+        api.pages["root:"] = FilePage(items: [], nextCursor: nil)
+        let resource = try localResource("original!")
+        defer { try? FileManager.default.removeItem(at: resource.fileURL) }
+        let candidate = PhotoSyncEngine.makeSnapshot(from: file("mac", size: 9), driveId: 7)
+        _ = try await ResourceBackup(api: api).findOrUpload(
+            resource: resource,
+            date: Date(),
+            token: "test",
+            localIdentifier: "local-photo",
+            driveId: 7,
+            folderId: "root",
+            candidates: [candidate]
+        )
+        XCTAssertEqual(api.uploads, 1)
+    }
+
+    func testCorruptUploadedContentCannotBecomeSuccessfulBackup() async throws {
+        let api = LibraryTestAPI(); api.corruptUploads = true
+        api.pages["root:"] = FilePage(items: [], nextCursor: nil)
+        let resource = try localResource("original")
+        defer { try? FileManager.default.removeItem(at: resource.fileURL) }
+        do {
+            _ = try await ResourceBackup(api: api).findOrUpload(
+                resource: resource,
+                date: Date(),
+                token: "test",
+                localIdentifier: "local-photo",
+                driveId: 7,
+                folderId: "root",
+                candidates: []
+            )
+            XCTFail("Corrupt upload must fail")
+        } catch { XCTAssertTrue(error is BackupSafetyError) }
+    }
+
+    func testUploadHostCannotExfiltrateToken() {
+        XCTAssertTrue(PhotoApiFetcher.trustedUploadHost(URL(string: "https://upload.kdrive.infomaniak.com")!))
+        for url in [
+            "https://infomaniak.com.attacker.test",
+            "http://upload.infomaniak.com",
+            "https://user@upload.infomaniak.com"
+        ] {
+            XCTAssertFalse(PhotoApiFetcher.trustedUploadHost(URL(string: url)!))
+        }
+    }
+
     private func keepRealm(_ configuration: Realm.Configuration) throws -> Realm {
         try Realm(configuration: configuration)
+    }
+
+    private func localResource(_ text: String) throws -> ExportedResource {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".jpg")
+        try Data(text.utf8).write(to: url)
+        return ExportedResource(
+            fileURL: url,
+            fileName: "test.jpg",
+            mimeType: "image/jpeg",
+            resourceType: 1,
+            originalFilename: "test.jpg"
+        )
     }
 
     private func file(

@@ -19,6 +19,7 @@
 import Combine
 import Foundation
 import kPhotosCore
+import kPhotosResources
 
 @MainActor
 public final class TimelineViewModel: ObservableObject {
@@ -37,6 +38,12 @@ public final class TimelineViewModel: ObservableObject {
         case finished(progress: SyncProgress)
         case failed(message: String)
     }
+
+    @Published private(set) var backupOverview = BackupOverview()
+    private var backupInventoryGeneration = UUID()
+    private var hasReconciledBackup = false
+    private var backupReadError: String?
+    private var localReloadTask: Task<Void, Never>?
 
     @Published public private(set) var state: State = .loading
     @Published public private(set) var syncState: SyncState = .idle
@@ -98,12 +105,14 @@ public final class TimelineViewModel: ObservableObject {
     @Published public private(set) var lastDeletionFailures: [DeletionFailure] = []
 
     /// Empêche les refresh distants concurrents (open + pull-to-refresh quasi simultanés).
-    @Published public private(set) var isRefreshingCloud = false
     @Published public private(set) var cloudRefreshError: String?
+    @Published public private(set) var isRefreshingCloud = false
+    public var cloudPhotoCount: Int { cloudPhotos.count }
 
     public init() {
         bindToUploadQueue()
         bindToLibrarySettings()
+        bindToBackupStatus()
         photos.changesPublisher
             .debounce(for: .seconds(2), scheduler: DispatchQueue.main)
             .sink { [weak self] in
@@ -113,30 +122,10 @@ public final class TimelineViewModel: ObservableObject {
             }.store(in: &cancellables)
     }
 
-    private func bindToLibrarySettings() {
-        syncSettings.publisher
-            .receive(on: DispatchQueue.main)
-            .map { [weak self] snapshot in
-                let drive = try? self?.driveManager.selectedDrive()
-                return [snapshot.rootFolderName, String(drive?.id ?? 0), drive?.rootFolderId ?? ""]
-            }
-            .removeDuplicates()
-            .dropFirst()
-            .sink { [weak self] _ in
-                guard let self else { return }
-                cloudPhotos = (try? currentLibraryPhotos()) ?? []
-                cloudRefreshError = nil
-                if case .ready(let summary, _) = state { rebuildState(summary: summary) }
-                Task {
-                    await self.metadataIndexer.suspend()
-                    await self.refreshCloud()
-                    await self.reconcileBackupQueue()
-                }
-            }
-            .store(in: &cancellables)
-    }
-
     public func load() async {
+        backupInventoryGeneration = UUID()
+        hasReconciledBackup = false
+        updateBackupOverview()
         let auth = assetReader.currentAuthorization()
         let hasLocalAccess = auth == .authorized || auth == .limited
         if hasLocalAccess { photoLibraryObserver.startObserving() }
@@ -158,6 +147,7 @@ public final class TimelineViewModel: ObservableObject {
 
         let summary = hasLocalAccess ? await assetReader.summary() : .empty
         rebuildState(summary: summary)
+        // Automatic preparation is independent of rendering the cached gallery.
 
         // 3a. Réconcilie la file persistante avec la photothèque iOS — enqueue
         //    en arrière-plan les assets locaux qui ne sont ni synced cloud ni
@@ -197,10 +187,90 @@ public final class TimelineViewModel: ObservableObject {
     /// est "la file reste dans son état précédent", la galerie continue de
     /// fonctionner.
     private func reconcileBackupQueue() async {
-        try? await sync.reconcile()
-        backupItems = Self.indexByLocalId((try? backupQueue.allItems()) ?? [])
-        if case .ready(let summary, _) = state {
-            rebuildState(summary: summary)
+        let generation = backupInventoryGeneration
+        let scope = try? driveManager.selectedDrive()
+        do {
+            try await sync.reconcile()
+            guard generation == backupInventoryGeneration, !Task.isCancelled else { return }
+            let current = try driveManager.selectedDrive()
+            guard current?.id == scope?.id, current?.rootFolderId == scope?.rootFolderId else { return }
+            backupItems = try Self.indexByLocalId(backupQueue.allItems())
+            hasReconciledBackup = true
+            backupReadError = nil
+        } catch {
+            guard generation == backupInventoryGeneration, !Task.isCancelled else { return }
+            hasReconciledBackup = false
+            backupReadError = error.localizedDescription
+        }
+        if case .ready(let summary, _) = state { rebuildState(summary: summary) }
+        else { updateBackupOverview() }
+    }
+
+    private func bindToBackupStatus() {
+        backupQueue.backupChangesPublisher
+            .debounce(for: .milliseconds(120), scheduler: DispatchQueue.main)
+            .sink { [weak self] in
+                guard let self else { return }
+                do {
+                    backupItems = try Self.indexByLocalId(backupQueue.allItems())
+                    backupReadError = nil
+                } catch { backupReadError = error.localizedDescription }
+                if case .ready(let summary, _) = state { rebuildState(summary: summary) }
+            }.store(in: &cancellables)
+        syncSettings.publisher
+            .map(\.mediaFilter)
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.photoLibraryObserver.restart()
+                self?.refreshLocalBackupInventory()
+            }.store(in: &cancellables)
+        syncSettings.publisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateBackupOverview() }
+            .store(in: &cancellables)
+        photoLibraryObserver.changesPublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.refreshLocalBackupInventory() }
+            .store(in: &cancellables)
+    }
+
+    /// A new or edited local asset must invalidate the completed claim, including after foregrounding.
+    func refreshLocalBackupInventory() {
+        guard case .ready = state else { return }
+        backupInventoryGeneration = UUID()
+        hasReconciledBackup = false
+        updateBackupOverview()
+        localReloadTask?.cancel()
+        localReloadTask = Task {
+            let assets = await self.assetReader.fetchAssetSnapshots(filter: .both)
+            guard !Task.isCancelled else { return }
+            self.localAssets = assets
+            await self.reconcileBackupQueue()
+        }
+    }
+
+    private func updateBackupOverview() {
+        do {
+            guard let drive = try driveManager.selectedDrive() else {
+                backupOverview = BackupOverview()
+                return
+            }
+            let running: Bool
+            if case .running = syncState { running = true } else { running = false }
+            let uploads = uploadQueue.currentScope == "\(drive.id):\(drive.rootFolderId)" ? uploadQueue.currentStates : [:]
+            backupOverview = try .make(BackupOverviewInput(
+                assets: localAssets, photos: cloudPhotos, queue: backupItems, uploads: uploads,
+                driveId: drive.id, rootId: drive.rootFolderId, settings: syncSettings.current(),
+                authorization: assetReader.currentAuthorization(), checked: hasReconciledBackup,
+                running: running, error: backupReadError
+            ))
+        } catch {
+            var overview = BackupOverview()
+            overview.phase = .attention
+            overview.errorMessage = error.localizedDescription
+            backupOverview = overview
         }
     }
 
@@ -230,6 +300,31 @@ public final class TimelineViewModel: ObservableObject {
             if error is CancellationError || Task.isCancelled { return }
             cloudRefreshError = error.localizedDescription
         }
+    }
+
+    private func bindToLibrarySettings() {
+        syncSettings.publisher
+            .receive(on: DispatchQueue.main)
+            .map { [weak self] snapshot in
+                let drive = try? self?.driveManager.selectedDrive()
+                return [snapshot.rootFolderName, String(drive?.id ?? 0), drive?.rootFolderId ?? ""]
+            }
+            .removeDuplicates()
+            .dropFirst()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                backupInventoryGeneration = UUID()
+                hasReconciledBackup = false
+                cloudPhotos = (try? currentLibraryPhotos()) ?? []
+                cloudRefreshError = nil
+                if case .ready(let summary, _) = state { rebuildState(summary: summary) }
+                Task {
+                    await self.metadataIndexer.suspend()
+                    await self.refreshCloud()
+                    await self.reconcileBackupQueue()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     /// Liste ordonnée des médias visibles dans la galerie, prête à être passée au
@@ -307,20 +402,17 @@ public final class TimelineViewModel: ObservableObject {
     }
 
     public func runSync() async {
+        if case .running = syncState { return }
         guard let drive = try? driveManager.selectedDrive() else {
-            syncState = .failed(message: "Aucun kDrive sélectionné.")
+            syncState = .failed(message: L10n.Timeline.noDriveTitle)
             return
         }
         syncState = .running(progress: SyncProgress(completed: 0, total: 0, lastUploadedFileName: nil))
+        updateBackupOverview()
         do {
             // L'espace Private est découvert automatiquement, puis kPhotos/ est créé dedans.
             // Cf. AGENTS.md §8 (arborescence kDrive).
             let rootFolderId = try await driveManager.ensureRootFolder(folderName: rootFolderName)
-            // Pull-then-push : on commence par récupérer les fichiers ajoutés depuis
-            // un autre appareil (web, autre tel) avant d'envoyer ceux qu'on a localement.
-            // Erreur ici = on continue quand même avec le push pour ne pas pénaliser
-            // l'utilisateur en cas de timeout sur le listing.
-            try? await sync.refreshFolder(driveId: drive.id, folderId: rootFolderId)
             // Manuel = drainer TOUTE la file (pas de cap arbitraire). C'est la
             // sémantique "comme Google Photos" : un clic sauvegarde tout ce qui
             // reste. `performWithRetry` côté API gère 429/5xx avec backoff donc
@@ -332,14 +424,18 @@ public final class TimelineViewModel: ObservableObject {
                 maxItems: nil,
                 onProgress: { [weak self] progress in
                     self?.syncState = .running(progress: progress)
+                    self?.updateBackupOverview()
                 }
             )
             if case .running(let progress) = syncState {
-                syncState = .finished(progress: progress)
+                syncState = progress.completed == progress.total
+                    ? .finished(progress: progress)
+                    : .failed(message: L10n.BackupSafety.partial(completed: progress.completed, total: progress.total))
             }
             await load()
         } catch {
             syncState = .failed(message: error.localizedDescription)
+            updateBackupOverview()
         }
     }
 
@@ -372,6 +468,7 @@ public final class TimelineViewModel: ObservableObject {
             calendar: .iso8601
         )
         state = .ready(summary: summary, sections: sections)
+        updateBackupOverview()
     }
 
     /// Indexe `[BackupItemSnapshot]` par `localIdentifier` pour les lookups O(1)
@@ -480,9 +577,11 @@ public final class TimelineViewModel: ObservableObject {
         // PHAsset local sans cloud n'a rien à supprimer côté serveur — Phase 2
         // pourra étendre pour supprimer aussi côté PhotoKit.
         // `selectedPhotos` gère le double cas fileId / localIdentifier.
-        let fileIdToLocalId = Dictionary(
-            uniqueKeysWithValues: selectedPhotos.map { ($0.fileId, $0.localIdentifier) }
-        )
+        var fileIdToLocalId: [String: String] = [:]
+        for photo in selectedPhotos {
+            fileIdToLocalId[photo.fileId] = photo.localIdentifier
+            if let motionId = photo.liveMotionFileId { fileIdToLocalId[motionId] = "" }
+        }
         let fileIds = Array(fileIdToLocalId.keys)
         guard !fileIds.isEmpty else {
             clearSelection()
@@ -492,13 +591,10 @@ public final class TimelineViewModel: ObservableObject {
         // 1. Enqueue persistant — chaque fileId entre dans DeletionItem en `.queued`.
         //    Si l'app crash entre ici et la fin du drain, le prochain `load()`
         //    reprendra la suppression depuis là où elle s'était arrêtée.
-        for fileId in fileIds {
-            try? await deletionQueueWriter.enqueueDeletion(
-                fileId: fileId,
-                driveId: drive.id,
-                localIdentifier: fileIdToLocalId[fileId] ?? ""
-            )
+        let requests = fileIds.map {
+            DeletionRequest(fileId: $0, driveId: drive.id, localIdentifier: fileIdToLocalId[$0] ?? "")
         }
+        do { try await deletionQueueWriter.enqueueDeletions(requests) } catch { return }
 
         clearSelection()
 
@@ -635,7 +731,7 @@ public final class TimelineViewModel: ObservableObject {
 
         // 1 seul appel API pour N photos grâce au bulk natif kDrive (cf. AlbumManager).
         // On extrait les fileIds depuis selectedPhotos (gère le cas synced / cloud-only).
-        let fileIds = selectedPhotos.map(\.fileId)
+        let fileIds = selectedPhotos.flatMap { [$0.fileId, $0.liveMotionFileId].compactMap { $0 } }
         try? await albumManager.addPhotos(fileIds: fileIds, toAlbumId: albumId, driveId: drive.id)
     }
 }

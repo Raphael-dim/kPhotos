@@ -118,9 +118,19 @@ final class GalleryComposerDeletionTests: XCTestCase {
 
     private func photo(fileId: String, localId: String) -> PhotoSnapshot {
         PhotoSnapshot(
-            id: fileId, driveId: 1, localIdentifier: localId, name: "\(fileId).jpg",
-            takenAt: date(), uploadedAt: date(), mimeType: "image/jpeg", size: 0,
-            isVideo: false, duration: 0, albumIds: [], syncStatus: .synced, isFavorite: false
+            id: fileId,
+            driveId: 1,
+            localIdentifier: localId,
+            name: "\(fileId).jpg",
+            takenAt: date(),
+            uploadedAt: date(),
+            mimeType: "image/jpeg",
+            size: 0,
+            isVideo: false,
+            duration: 0,
+            albumIds: [],
+            syncStatus: .synced,
+            isFavorite: false
         )
     }
 
@@ -130,9 +140,15 @@ final class GalleryComposerDeletionTests: XCTestCase {
         reason: String = ""
     ) -> DeletionItemSnapshot {
         DeletionItemSnapshot(
-            fileId: fileId, driveId: 1, localIdentifier: "", state: state,
-            enqueuedAt: date(), attemptCount: 0, lastAttemptAt: nil,
-            nextRetryAt: nil, lastErrorReason: reason
+            fileId: fileId,
+            driveId: 1,
+            localIdentifier: "",
+            state: state,
+            enqueuedAt: date(),
+            attemptCount: 0,
+            lastAttemptAt: nil,
+            nextRetryAt: nil,
+            lastErrorReason: reason
         )
     }
 }

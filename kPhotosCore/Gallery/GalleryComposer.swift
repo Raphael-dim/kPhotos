@@ -131,7 +131,8 @@ public final class GalleryComposerImpl: GalleryComposing {
 
         for asset in localAssets {
             localIdsCovered.insert(asset.localIdentifier)
-            let cloud = cloudByLocalId[asset.localIdentifier]
+            var cloud = cloudByLocalId[asset.localIdentifier]
+            if cloud?.localModifiedAt != asset.modifiedAt { cloud?.backupComplete = false }
             // La suppression est indexée par `fileId`. Pour un asset local on ne
             // peut donc piloter le badge "deletion in progress" que si l'asset
             // a déjà été uploadé (cloud != nil). Cas typique : l'utilisateur
@@ -144,7 +145,7 @@ public final class GalleryComposerImpl: GalleryComposing {
                 deletionItem: deletion,
                 uploadStates: uploadStates
             )
-            items.append(GalleryItem(
+            var item = GalleryItem(
                 id: asset.localIdentifier,
                 takenAt: asset.takenAt,
                 isVideo: asset.isVideo,
@@ -152,7 +153,8 @@ public final class GalleryComposerImpl: GalleryComposing {
                 cloudFileId: cloud?.fileId,
                 cloudDriveId: cloud?.driveId,
                 syncState: state
-            ))
+            )
+            items.append(item)
         }
 
         for cloud in cloudPhotos {
@@ -167,7 +169,7 @@ public final class GalleryComposerImpl: GalleryComposing {
                 }
                 return .cloudOnly
             }()
-            items.append(GalleryItem(
+            var item = GalleryItem(
                 id: GalleryItem.cloudOnlyID(fileId: cloud.fileId),
                 takenAt: cloud.takenAt,
                 isVideo: cloud.isVideo,
@@ -175,7 +177,8 @@ public final class GalleryComposerImpl: GalleryComposing {
                 cloudFileId: cloud.fileId,
                 cloudDriveId: cloud.driveId,
                 syncState: state
-            ))
+            )
+            items.append(item)
         }
 
         // Tri global decroissant sur la date de prise de vue (cf. §6 AGENTS.md —
@@ -188,20 +191,20 @@ public final class GalleryComposerImpl: GalleryComposing {
     /// pour rester cohérente entre le path "local + cloud" et "cloudOnly".
     static func deletionState(from item: DeletionItemSnapshot) -> GalleryItemSyncState {
         switch item.state {
-        case .queued: return .deletionPending
-        case .deleting: return .deleting
+        case .queued: .deletionPending
+        case .deleting: .deleting
         case .failedTransient:
             // Comme côté upload : silencieux côté UI tant qu'on n'a pas dépassé
             // le plafond. On retombe sur le badge "deletionPending" — visuel
             // "suppression en cours / en attente d'un retry", pas alarmiste.
-            return .deletionPending
+            .deletionPending
         case .failedPermanent:
-            return .deletionFailed(reason: item.lastErrorReason)
+            .deletionFailed(reason: item.lastErrorReason)
         case .completed:
             // Ne devrait pas arriver — l'engine purge les `.completed` dans la
             // même transaction qu'il supprime le Photo. Si on tombe ici, on
             // ignore visuellement (retombe en .cloudOnly par le caller).
-            return .cloudOnly
+            .cloudOnly
         }
     }
 
@@ -236,12 +239,12 @@ public final class GalleryComposerImpl: GalleryComposing {
             case .failed, .completed: break // ignorés — la vérité vient de Realm
             }
         }
-        if let cloud, cloud.syncStatus == .synced { return .synced }
+        if let cloud, cloud.syncStatus == .synced, cloud.backupComplete { return .synced }
         if let backupItem {
             switch backupItem.state {
             case .queued: return .pendingUpload
             case .uploading: return .uploading(fraction: nil)
-            case .completed: return .synced
+            case .completed: return .localOnly
             case .failedTransient:
                 // Volontairement silencieux côté UI — l'item sera retenté
                 // automatiquement après son `nextRetryAt`. Pas de badge orange

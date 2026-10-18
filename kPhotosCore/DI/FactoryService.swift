@@ -175,6 +175,7 @@ public enum FactoryService {
         store.store(factory: Factory(type: PhotoSyncing.self) { _, _ in
             PhotoSyncEngine(
                 api: resolve(),
+                drives: resolve(),
                 photoReader: resolve(),
                 photoWriter: resolve(),
                 backupQueueReader: resolve(),

@@ -18,6 +18,15 @@
 
 import Foundation
 import Photos
+import UniformTypeIdentifiers
+
+public struct ExportedResource: Equatable {
+    public let fileURL: URL
+    public let fileName: String
+    public let mimeType: String
+    public let resourceType: Int
+    public let originalFilename: String
+}
 
 public struct ExportedAsset: Equatable {
     public let localIdentifier: String
@@ -26,6 +35,9 @@ public struct ExportedAsset: Equatable {
     public let takenAt: Date
     public let mimeType: String
     public let isVideo: Bool
+    public var additionalResources: [ExportedResource] = []
+    public var metadata: Data?
+    public var coordinate: MediaCoordinate?
 }
 
 public protocol PHAssetExporting: AnyObject {
@@ -54,11 +66,11 @@ public enum ExportError: Error, Equatable, LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .noResource:
-            return "Aucune ressource exploitable trouvée pour ce média (Live Photo incomplète, RAW non supporté, ou asset corrompu)."
+            "Aucune ressource exploitable trouvée pour ce média (Live Photo incomplète, RAW non supporté, ou asset corrompu)."
         case .missingCreationDate:
-            return "Date de prise de vue absente — ce média ne peut pas être indexé chronologiquement."
+            "Date de prise de vue absente — ce média ne peut pas être indexé chronologiquement."
         case .writeFailed(let detail):
-            return "Téléchargement de l'original depuis iCloud impossible. \(detail)"
+            "Téléchargement de l'original depuis iCloud impossible. \(detail)"
         }
     }
 }
@@ -94,18 +106,18 @@ public final class PHAssetExporterImpl: PHAssetExporting {
     static func predicate(for filter: SyncMediaFilter) -> NSPredicate? {
         switch filter {
         case .photosOnly:
-            return NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+            NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
         case .videosOnly:
-            return NSPredicate(format: "mediaType == %d", PHAssetMediaType.video.rawValue)
+            NSPredicate(format: "mediaType == %d", PHAssetMediaType.video.rawValue)
         case .both:
-            return NSPredicate(
+            NSPredicate(
                 format: "mediaType == %d OR mediaType == %d",
                 PHAssetMediaType.image.rawValue,
                 PHAssetMediaType.video.rawValue
             )
         default:
             // OptionSet vide : on ne synchronise rien.
-            return NSPredicate(value: false)
+            NSPredicate(value: false)
         }
     }
 
@@ -120,28 +132,101 @@ public final class PHAssetExporterImpl: PHAssetExporting {
             throw ExportError.noResource
         }
 
-        let fileName = Self.makeFileName(
+        let baseName = Self.makeFileName(
             creationDate: creationDate,
             localIdentifier: asset.localIdentifier,
             uniformTypeIdentifier: primary.uniformTypeIdentifier,
             originalFilename: primary.originalFilename
         )
-        let destination = exportDirectory.appendingPathComponent(fileName)
-
-        if fileManager.fileExists(atPath: destination.path) {
-            try? fileManager.removeItem(at: destination)
+        let revision = asset.modificationDate.map { String(Int($0.timeIntervalSince1970 * 1000)) } ?? "original"
+        let fileName = (baseName as NSString).deletingPathExtension + "_v" + revision
+            + "." + (baseName as NSString).pathExtension
+        let directory = exportDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        do {
+            let destination = directory.appendingPathComponent(fileName)
+            try await writeResource(primary, to: destination)
+            var additional: [ExportedResource] = []
+            var descriptors: [[String: Any]] = [[
+                "fileName": fileName,
+                "originalFilename": primary.originalFilename,
+                "resourceType": primary.type.rawValue
+            ]]
+            for (index, resource) in resources.enumerated() where resource !== primary {
+                try Task.checkCancellation()
+                let ext = (resource.originalFilename as NSString).pathExtension
+                let name = (fileName as NSString).deletingPathExtension
+                    + "__kphotos_resource_\(resource.type.rawValue)_\(index)." + (ext.isEmpty ? "dat" : ext)
+                let url = directory.appendingPathComponent(name)
+                try await writeResource(resource, to: url)
+                additional.append(ExportedResource(
+                    fileURL: url,
+                    fileName: name,
+                    mimeType: Self.mimeType(from: resource.uniformTypeIdentifier),
+                    resourceType: resource.type.rawValue,
+                    originalFilename: resource.originalFilename
+                ))
+                descriptors.append([
+                    "fileName": name,
+                    "originalFilename": resource.originalFilename,
+                    "resourceType": resource.type.rawValue
+                ])
+            }
+            // Fail closed if PhotoKit reports a Live Photo without its motion resource.
+            if asset.mediaSubtypes.contains(.photoLive), !resources.contains(where: { $0.type == .pairedVideo }) {
+                throw BackupSafetyError.incomplete
+            }
+            var metadata: [String: Any] = [
+                "version": 1,
+                "localIdentifier": asset.localIdentifier,
+                "createdAt": creationDate.timeIntervalSince1970,
+                "isFavorite": asset.isFavorite,
+                "isHidden": asset.isHidden,
+                "pixelWidth": asset.pixelWidth,
+                "pixelHeight": asset.pixelHeight,
+                "duration": asset.duration,
+                "mediaType": asset.mediaType.rawValue,
+                "mediaSubtypes": asset.mediaSubtypes.rawValue,
+                "resources": descriptors
+            ]
+            if let date = asset.modificationDate { metadata["modifiedAt"] = date.timeIntervalSince1970 }
+            if let id = asset.burstIdentifier { metadata["burstIdentifier"] = id }
+            if let location = asset.location {
+                metadata["location"] = [
+                    "latitude": location.coordinate.latitude,
+                    "longitude": location.coordinate.longitude,
+                    "altitude": location.altitude,
+                    "horizontalAccuracy": location.horizontalAccuracy,
+                    "verticalAccuracy": location.verticalAccuracy
+                ]
+            }
+            var albums: [[String: String]] = []
+            PHAssetCollection.fetchAssetCollectionsContaining(asset, with: .album, options: nil)
+                .enumerateObjects { album, _, _ in
+                    albums.append(["identifier": album.localIdentifier, "title": album.localizedTitle ?? ""])
+                }
+            metadata["albums"] = albums
+            var exported = ExportedAsset(
+                localIdentifier: asset.localIdentifier,
+                fileURL: destination,
+                fileName: fileName,
+                takenAt: creationDate,
+                mimeType: Self.mimeType(from: primary.uniformTypeIdentifier),
+                isVideo: asset.mediaType == .video
+            )
+            if let location = asset.location, location.horizontalAccuracy >= 0 {
+                exported.coordinate = MediaCoordinate(
+                    latitude: location.coordinate.latitude,
+                    longitude: location.coordinate.longitude
+                )
+            }
+            exported.additionalResources = additional
+            exported.metadata = try JSONSerialization.data(withJSONObject: metadata, options: [.sortedKeys])
+            return exported
+        } catch {
+            try? fileManager.removeItem(at: directory) // Only this export's temporary resources.
+            throw error
         }
-
-        try await writeResource(primary, to: destination)
-
-        return ExportedAsset(
-            localIdentifier: asset.localIdentifier,
-            fileURL: destination,
-            fileName: fileName,
-            takenAt: creationDate,
-            mimeType: Self.mimeType(from: primary.uniformTypeIdentifier),
-            isVideo: asset.mediaType == .video
-        )
     }
 
     // MARK: - Helpers
@@ -171,23 +256,23 @@ public final class PHAssetExporterImpl: PHAssetExporting {
 
     static func mimeType(from uti: String) -> String {
         switch uti {
-        case "public.jpeg": return "image/jpeg"
-        case "public.png": return "image/png"
-        case "public.heic", "public.heif": return "image/heic"
-        case "com.apple.quicktime-movie": return "video/quicktime"
-        case "public.mpeg-4": return "video/mp4"
-        default: return "application/octet-stream"
+        case "public.jpeg": "image/jpeg"
+        case "public.png": "image/png"
+        case "public.heic", "public.heif": "image/heic"
+        case "com.apple.quicktime-movie": "video/quicktime"
+        case "public.mpeg-4": "video/mp4"
+        default: UTType(uti)?.preferredMIMEType ?? "application/octet-stream"
         }
     }
 
     static func fileExtension(from uti: String) -> String {
         switch uti {
-        case "public.jpeg": return "jpg"
-        case "public.png": return "png"
-        case "public.heic", "public.heif": return "heic"
-        case "com.apple.quicktime-movie": return "mov"
-        case "public.mpeg-4": return "mp4"
-        default: return "dat"
+        case "public.jpeg": "jpg"
+        case "public.png": "png"
+        case "public.heic", "public.heif": "heic"
+        case "com.apple.quicktime-movie": "mov"
+        case "public.mpeg-4": "mp4"
+        default: "dat"
         }
     }
 

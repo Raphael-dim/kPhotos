@@ -69,6 +69,7 @@ public extension PhotoWriting {
 /// File de sauvegarde persistante. Indexée par `localIdentifier` du PHAsset.
 /// Cf. `BackupItem` pour la sémantique du state machine.
 public protocol BackupQueueReading: AnyObject {
+    var backupChangesPublisher: AnyPublisher<Void, Never> { get }
     /// Tous les items, indépendamment de leur état. Tri non garanti.
     func allItems() throws -> [BackupItemSnapshot]
 
@@ -89,9 +90,14 @@ public protocol BackupQueueReading: AnyObject {
     func completedLocalIdentifiers() throws -> Set<String>
 }
 
+public extension BackupQueueReading {
+    var backupChangesPublisher: AnyPublisher<Void, Never> { Empty().eraseToAnyPublisher() }
+}
+
 public protocol BackupQueueWriting: AnyObject {
     /// Réconcilie toute la photothèque en une transaction, sans rouvrir Realm
     /// pour chaque photo. Les items déjà connus gardent leur clientToken.
+    func reconcile(localAssets: [LocalAssetSnapshot], syncedIdentifiers: Set<String>) async throws
 
     /// Ajoute un asset s'il n'est pas déjà en file. No-op si un item existe déjà
     /// pour ce `localIdentifier` (quel que soit son état) — la dédup est gérée
@@ -252,6 +258,16 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
                 .collectionPublisher.map { _ in () }.replaceError(with: ()).eraseToAnyPublisher()
         } catch {
             // Database errors remain visible through the throwing read methods.
+            return Empty().eraseToAnyPublisher()
+        }
+    }
+
+    public var backupChangesPublisher: AnyPublisher<Void, Never> {
+        do {
+            return try Realm(configuration: realm.configuration).objects(BackupItem.self)
+                .collectionPublisher.map { _ in () }.replaceError(with: ()).eraseToAnyPublisher()
+        } catch {
+            // The status panel reports the error from its throwing queue read.
             return Empty().eraseToAnyPublisher()
         }
     }
@@ -510,6 +526,33 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
     }
 
     // MARK: - BackupQueueWriting
+
+    public func reconcile(localAssets: [LocalAssetSnapshot], syncedIdentifiers: Set<String>) async throws {
+        try await realm.write { realm in
+            let completed = Array(
+                realm.objects(BackupItem.self)
+                    .filter("stateRaw == %@", BackupItemState.completed.rawValue)
+            )
+            for item in completed where !syncedIdentifiers.contains(item.localIdentifier) {
+                item.state = .queued
+                item.lastErrorReason = ""
+                item.nextRetryAt = nil
+            }
+
+            for asset in localAssets where !asset.localIdentifier.isEmpty
+                && !syncedIdentifiers.contains(asset.localIdentifier) {
+                guard realm.object(ofType: BackupItem.self, forPrimaryKey: asset.localIdentifier) == nil else { continue }
+                let item = BackupItem()
+                item.localIdentifier = asset.localIdentifier
+                item.state = .queued
+                item.clientToken = UUID().uuidString
+                item.enqueuedAt = Date()
+                item.creationDate = asset.takenAt
+                item.isVideo = asset.isVideo
+                realm.add(item)
+            }
+        }
+    }
 
     public func enqueueIfAbsent(
         localIdentifier: String,

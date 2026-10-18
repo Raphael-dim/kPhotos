@@ -34,6 +34,28 @@ final class MetadataIndexStoreTests: XCTestCase {
         return (accessor, realm, PhotoManagerImpl(realm: accessor), MetadataIndexStore(realm: accessor))
     }
 
+    func testBackupQueuePublishesStateChangesWithoutPhotoChanges() async throws {
+        let config = Realm.Configuration(
+            inMemoryIdentifier: UUID().uuidString,
+            objectTypes: [Photo.self, BackupItem.self]
+        )
+        // Keep the synchronous initializer: async overload inference would require suspension here.
+        // swiftformat:disable:next redundantClosure
+        let realm = try { try Realm(configuration: config) }()
+        let accessor = RealmAccessorImpl(configuration: config)
+        let manager = PhotoManagerImpl(realm: accessor)
+        try await manager.enqueueIfAbsent(localIdentifier: "local", creationDate: Date(), isVideo: false)
+        let changed = expectation(description: "Uploading state published")
+        let subscription = manager.backupChangesPublisher.sink {
+            if (try? manager.item(localIdentifier: "local"))?.state == .uploading { changed.fulfill() }
+        }
+        try await manager.markUploading(localIdentifier: "local")
+        await fulfillment(of: [changed], timeout: 3)
+        subscription.cancel()
+        realm.refresh()
+        XCTAssertEqual(realm.objects(BackupItem.self).first?.state, .uploading)
+    }
+
     func testPausedPreparationPublishesCountsForItsOwnScope() async throws {
         let (_, realm, writer, store) = try environment()
         try await writer.upsert(photo())

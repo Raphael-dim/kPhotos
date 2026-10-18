@@ -23,14 +23,16 @@ public struct SyncProgress: Equatable {
     public let completed: Int
     public let total: Int
     public let lastUploadedFileName: String?
+    public let processed: Int
 
-    public init(completed: Int, total: Int, lastUploadedFileName: String?) {
+    public init(completed: Int, total: Int, lastUploadedFileName: String?, processed: Int? = nil) {
         self.completed = completed
         self.total = total
         self.lastUploadedFileName = lastUploadedFileName
+        self.processed = processed ?? completed
     }
 
-    public var fraction: Double { total == 0 ? 0 : Double(completed) / Double(total) }
+    public var fraction: Double { total == 0 ? 0 : Double(processed) / Double(total) }
 }
 
 /// Erreur métier remontée quand la sync ne peut pas démarrer pour des raisons
@@ -43,11 +45,11 @@ public enum SyncPolicyError: Error, LocalizedError, Equatable {
         switch self {
         case .networkNotAllowed(let current, _):
             switch current {
-            case .offline: return "Aucune connexion réseau."
-            case .cellular: return "Sync via données cellulaires désactivée."
-            case .wifi, .other: return "Sync via Wi-Fi désactivée."
+            case .offline: "Aucune connexion réseau."
+            case .cellular: "Sync via données cellulaires désactivée."
+            case .wifi, .other: "Sync via Wi-Fi désactivée."
             }
-        case .nothingToSync: return "Aucune photo à synchroniser."
+        case .nothingToSync: "Aucune photo à synchroniser."
         }
     }
 }
@@ -60,8 +62,8 @@ public protocol PhotoSyncing: AnyObject {
     /// enqueue dans `BackupItem` chaque asset PhotoKit qui n'est ni déjà connu de la
     /// file (quel que soit son état) ni déjà synced côté cloud.
     /// Idempotent — peut être appelée à chaque ouverture de l'app sans risque de
-    /// doublon (la clé primaire `localIdentifier` + `enqueueIfAbsent` garantissent
-    /// l'absence de re-insertion).
+    /// doublon (la clé primaire `localIdentifier` + la transaction de réconciliation
+    /// garantissent l'absence de re-insertion).
     /// Honore `SyncSettings.mediaFilter` : un asset filtré ne rentre pas en file.
     func reconcile() async throws
 
@@ -80,6 +82,7 @@ public protocol PhotoSyncing: AnyObject {
 
 public final class PhotoSyncEngine: PhotoSyncing {
     private let api: PhotoApiFetching
+    private let drives: DriveManaging
     private let photoReader: PhotoReading
     private let photoWriter: PhotoWriting
     private let backupQueueReader: BackupQueueReading
@@ -93,6 +96,7 @@ public final class PhotoSyncEngine: PhotoSyncing {
 
     public init(
         api: PhotoApiFetching,
+        drives: DriveManaging,
         photoReader: PhotoReading,
         photoWriter: PhotoWriting,
         backupQueueReader: BackupQueueReading,
@@ -105,6 +109,7 @@ public final class PhotoSyncEngine: PhotoSyncing {
         fileManager: FileManager = .default
     ) {
         self.api = api
+        self.drives = drives
         self.photoReader = photoReader
         self.photoWriter = photoWriter
         self.backupQueueReader = backupQueueReader
@@ -139,27 +144,36 @@ public final class PhotoSyncEngine: PhotoSyncing {
         // - déjà connus de la file persistante (peu importe l'état : queued, uploading,
         //   completed, failedPermanent, skipped). Ne pas re-insérer un item `.skipped`
         //   automatiquement — l'utilisateur l'a explicitement écarté.
+        guard let drive = try drives.selectedDrive() else { return }
+        let localDates = Dictionary(uniqueKeysWithValues: localAssets.map { ($0.localIdentifier, $0.modifiedAt) })
         let syncedIdentifiers: Set<String> = try Set(
             (photoReader.allPhotos())
+                .filter { $0.driveId == drive.id && $0.libraryRootId == drive.rootFolderId
+                    && $0.isAvailable && $0.backupComplete && $0.localModifiedAt == localDates[$0.localIdentifier]
+                }
                 .map(\.localIdentifier)
                 .filter { !$0.isEmpty }
         )
-        let knownIdentifiers: Set<String> = try Set(
-            (backupQueueReader.allItems()).map(\.localIdentifier)
-        )
-
-        for asset in localAssets {
-            if syncedIdentifiers.contains(asset.localIdentifier) { continue }
-            if knownIdentifiers.contains(asset.localIdentifier) { continue }
-            try await backupQueueWriter.enqueueIfAbsent(
-                localIdentifier: asset.localIdentifier,
-                creationDate: asset.takenAt,
-                isVideo: asset.isVideo
-            )
-        }
+        try await backupQueueWriter.reconcile(localAssets: localAssets, syncedIdentifiers: syncedIdentifiers)
     }
 
     public func runFullSync(
+        driveId: Int,
+        folderId: String,
+        maxItems: Int?,
+        onProgress: @MainActor @escaping (SyncProgress) -> Void
+    ) async throws {
+        guard await BackupRunLock.shared.acquire() else { throw BackupSafetyError.busy }
+        do {
+            try await performFullSync(driveId: driveId, folderId: folderId, maxItems: maxItems, onProgress: onProgress)
+            await BackupRunLock.shared.release()
+        } catch {
+            await BackupRunLock.shared.release()
+            throw error
+        }
+    }
+
+    private func performFullSync(
         driveId: Int,
         folderId: String,
         maxItems: Int?,
@@ -175,22 +189,25 @@ public final class PhotoSyncEngine: PhotoSyncing {
             )
         }
 
-        // S'assure que tout asset local non encore connu de la file y entre AVANT
-        // de calculer `total`. Sinon l'utilisateur cliquerait "Synchroniser" sur une
-        // file partiellement remplie et verrait "0 sur N" alors que des dizaines
-        // d'autres assets méritent d'être traités.
+        // Une lecture récursive de toute la bibliothèque cloud pouvait prendre
+        // des minutes avant le premier upload. ResourceBackup vérifie chaque
+        // destination et ses octets avant de réutiliser ou d'envoyer un fichier.
         try await reconcile()
 
         // Sweep des items bloqués en `.uploading` — crash, kill OS, BGTask
         // expirée. Sans ça, ils resteraient orphelins (non-pickable par
         // `nextProcessable`). Idempotent, coûte une transaction Realm.
-        try? await backupQueueWriter.resetOrphanedUploads()
+        try await backupQueueWriter.resetOrphanedUploads()
 
-        let processable = (try? backupQueueReader.nextProcessable(now: Date(), limit: maxItems)) ?? []
+        uploadQueue.beginScope(driveId: driveId, rootId: folderId)
+        let processable = try backupQueueReader.nextProcessable(now: Date(), limit: maxItems)
+        let resourceBackup = ResourceBackup(api: api)
+        var verifiedCount = 0
+        var processedCount = 0
         await onProgress(SyncProgress(completed: 0, total: processable.count, lastUploadedFileName: nil))
         if processable.isEmpty { return }
 
-        for (index, item) in processable.enumerated() {
+        for item in processable {
             // Bail out propre si la `Task` a été cancellée (typiquement
             // `BGProcessingTask.expirationHandler`). Les items déjà traités
             // sont persistés dans BackupItem.
@@ -199,12 +216,13 @@ public final class PhotoSyncEngine: PhotoSyncing {
             // Le badge spinner sur la tuile est piloté par UploadQueue (transient).
             // L'état persistant `.uploading` côté BackupItem trace les retries.
             uploadQueue.mark(localIdentifier: item.localIdentifier, state: .uploading(fraction: nil))
-            try? await backupQueueWriter.markUploading(localIdentifier: item.localIdentifier)
+            try await backupQueueWriter.markUploading(localIdentifier: item.localIdentifier)
 
             let progressedName: String?
             do {
-                let result = try await uploadOne(item: item, driveId: driveId, folderId: folderId)
-                try? await backupQueueWriter.markCompleted(localIdentifier: item.localIdentifier)
+                let result = try await uploadOne(item: item, driveId: driveId, folderId: folderId, backup: resourceBackup)
+                try await backupQueueWriter.markCompleted(localIdentifier: item.localIdentifier)
+                verifiedCount += 1
                 uploadQueue.mark(localIdentifier: item.localIdentifier, state: .completed)
                 progressedName = result.name
             } catch is CancellationError {
@@ -229,13 +247,13 @@ public final class PhotoSyncEngine: PhotoSyncing {
                 switch decision {
                 case .transient(let retryAfter):
                     let nextAt = Date().addingTimeInterval(retryAfter)
-                    try? await backupQueueWriter.markFailedTransient(
+                    try await backupQueueWriter.markFailedTransient(
                         localIdentifier: item.localIdentifier,
                         reason: reason,
                         nextRetryAt: nextAt
                     )
                 case .permanent:
-                    try? await backupQueueWriter.markFailedPermanent(
+                    try await backupQueueWriter.markFailedPermanent(
                         localIdentifier: item.localIdentifier, reason: reason
                     )
                 }
@@ -243,10 +261,12 @@ public final class PhotoSyncEngine: PhotoSyncing {
                 progressedName = nil
             }
 
+            processedCount += 1
             await onProgress(SyncProgress(
-                completed: index + 1,
+                completed: verifiedCount,
                 total: processable.count,
-                lastUploadedFileName: progressedName
+                lastUploadedFileName: progressedName,
+                processed: processedCount
             ))
         }
 
@@ -279,30 +299,85 @@ public final class PhotoSyncEngine: PhotoSyncing {
     private func uploadOne(
         item: BackupItemSnapshot,
         driveId: Int,
-        folderId: String
+        folderId: String,
+        backup: ResourceBackup
     ) async throws -> PhotoSnapshot {
         let fetch = PHAsset.fetchAssets(withLocalIdentifiers: [item.localIdentifier], options: nil)
-        guard let asset = fetch.firstObject else {
-            // L'asset a été supprimé localement entre l'enqueue et le drain.
-            // On bascule en `.skipped` côté caller via le catch — ici on lève
-            // une erreur explicite pour que le caller la classe correctement.
-            throw ExportError.noResource
-        }
-
+        guard let asset = fetch.firstObject else { throw ExportError.noResource }
         let exported = try await exporter.export(asset)
-        defer { try? fileManager.removeItem(at: exported.fileURL) }
-
-        let dto = try await api.upload(
-            driveId: driveId,
-            folderId: folderId,
+        let manifestURL = exported.fileURL.deletingLastPathComponent().appendingPathComponent(exported.fileName + ".kphotos.json")
+        defer {
+            for url in [exported.fileURL, manifestURL] + exported.additionalResources.map(\.fileURL) {
+                try? fileManager.removeItem(at: url) // Files owned by this temporary export only.
+            }
+            let directory = exported.fileURL.deletingLastPathComponent()
+            if directory.deletingLastPathComponent().lastPathComponent == "kPhotosExports" {
+                try? fileManager.removeItem(at: directory)
+            }
+        }
+        let destination = try await backup.destination(driveId: driveId, rootId: folderId, date: exported.takenAt)
+        let candidates = try photoReader.allPhotos().filter {
+            $0.driveId == driveId && $0.libraryRootId == folderId && $0.isAvailable
+        }
+        let primary = ExportedResource(
             fileURL: exported.fileURL,
             fileName: exported.fileName,
-            createdAt: exported.takenAt,
             mimeType: exported.mimeType,
-            clientToken: item.clientToken
+            resourceType: 0,
+            originalFilename: exported.fileName
         )
-
-        let snapshot = Self.makeSnapshot(from: dto, exported: exported, driveId: driveId)
+        var verified: [(RemoteFileDTO, String)] = []
+        for resource in [primary] + exported.additionalResources {
+            try Task.checkCancellation()
+            let result = try await backup.findOrUpload(
+                resource: resource,
+                date: exported.takenAt,
+                token: item.clientToken,
+                localIdentifier: exported.localIdentifier,
+                driveId: driveId,
+                folderId: destination,
+                candidates: candidates
+            )
+            verified.append(result)
+        }
+        guard let (dto, hash) = verified.first, let metadata = exported.metadata,
+              var manifest = try JSONSerialization.jsonObject(with: metadata) as? [String: Any] else {
+            throw BackupSafetyError.incomplete
+        }
+        manifest["verifiedFiles"] = verified.map { [
+            "driveId": driveId,
+            "fileId": $0.0.id,
+            "name": $0.0.name,
+            "sha256": $0.1
+        ] as [String: Any]
+        }
+        try JSONSerialization.data(withJSONObject: manifest, options: [.sortedKeys]).write(to: manifestURL, options: .atomic)
+        let sidecar = ExportedResource(
+            fileURL: manifestURL,
+            fileName: manifestURL.lastPathComponent,
+            mimeType: "application/json",
+            resourceType: -1,
+            originalFilename: manifestURL.lastPathComponent
+        )
+        let manifestResult = try await backup.findOrUpload(
+            resource: sidecar,
+            date: exported.takenAt,
+            token: item.clientToken,
+            localIdentifier: exported.localIdentifier,
+            driveId: driveId,
+            folderId: destination,
+            candidates: []
+        )
+        var snapshot = Self.makeSnapshot(from: dto, exported: exported, driveId: driveId)
+        snapshot.libraryRootId = folderId
+        snapshot.contentSHA256 = hash
+        snapshot.resourceFileIds = verified.map(\.0.id) + [manifestResult.0.id]
+        snapshot.backupComplete = true
+        snapshot.localModifiedAt = asset.modificationDate
+        snapshot.resourceRevisions = Dictionary(
+            (verified + [manifestResult]).map { ($0.0.id, $0.0.revision) },
+            uniquingKeysWith: { _, last in last }
+        )
         try await photoWriter.upsert(snapshot)
         return snapshot
     }
@@ -329,11 +404,13 @@ public final class PhotoSyncEngine: PhotoSyncing {
         )
         snapshot.remoteRevision = dto.revision
         snapshot.captureDateSource = "photokit"
+        snapshot.coordinate = exported.coordinate
+        snapshot.locationSource = exported.coordinate == nil ? "" : "photokit"
         return snapshot
     }
 
     /// Construit un snapshot pour un fichier découvert en listant kDrive (pas de PHAsset local).
-    /// `takenAt` utilise la chaîne de fallback `created_at → added_at → last_modified_at`
+    /// `takenAt` utilise la chaîne de fallback `created_at → last_modified_at → added_at`
     /// pour éviter la date 1970 sur les fichiers uploadés depuis le web sans EXIF
     /// (cf. doc OpenAPI : `created_at` n'est rempli que si extractible des metadata).
     /// `uploadedAt` privilégie `added_at` (date d'upload immuable) plutôt que
@@ -388,6 +465,12 @@ public enum BackupRetryClassifier {
         // Escalade : au-delà du plafond, toute erreur transient devient permanent.
         guard attemptCount <= maxTransientAttempts else { return .permanent }
 
+        if let safety = error as? BackupSafetyError {
+            switch safety {
+            case .incomplete, .integrity, .tooLarge: return .permanent
+            case .busy: return .transient(retryAfter: 30)
+            }
+        }
         if let exportError = error as? ExportError {
             switch exportError {
             case .missingCreationDate, .noResource:
@@ -438,6 +521,8 @@ public enum BackupRetryClassifier {
     }
 }
 
+/// Finish the selected library, including a folder changed during a previous read.
+/// Older scopes can remain cached, but must never become the visible result.
 public struct CloudLibraryRefresh {
     private let drives: DriveManaging
     private let settings: SyncSettingsReading

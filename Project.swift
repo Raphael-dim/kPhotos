@@ -31,6 +31,7 @@ let coreTarget = TargetFactory.framework(
     name: "kPhotosCore",
     sources: ["kPhotosCore/**"],
     dependencies: [
+        .target(name: "kPhotosResources"),
         realm,
         realmSwift,
         alamofire

@@ -20,7 +20,7 @@ import Alamofire
 import Foundation
 
 public extension PhotoApiFetcher {
-    /// Upload simple (≤ 1 GB) vers kDrive.
+    /// Upload simple (≤ 50 MB), puis upload par blocs au-delà.
     /// **Format requis par l'API** (cf. docs/api/infomaniak_openapi.json — `/3/drive/{drive_id}/upload`) :
     /// - Content-Type `application/octet-stream`
     /// - Toutes les métadonnées en **query params** (PAS de multipart)
@@ -44,6 +44,17 @@ public extension PhotoApiFetcher {
         let createdAtUnix = Int(createdAt.timeIntervalSince1970)
         let totalSize = (try? FileManager.default.attributesOfItem(atPath: fileURL.path)[.size] as? Int) ?? 0
 
+        if totalSize > Self.chunkSize {
+            return try await uploadChunked(
+                driveId: driveId,
+                folderId: folderId,
+                fileURL: fileURL,
+                fileName: fileName,
+                createdAt: createdAt,
+                totalSize: totalSize,
+                clientToken: clientToken
+            )
+        }
         return try await performWithRetry { [weak self] in
             guard let self else { throw PhotoAPIError.network(underlying: "fetcher deallocated") }
             return try await performUpload(
@@ -89,7 +100,7 @@ public extension PhotoApiFetcher {
                 fileURL,
                 to: endpoint.url,
                 method: .post,
-                headers: HTTPHeaders([HTTPHeader(name: "Content-Type", value: mimeType)])
+                headers: HTTPHeaders([HTTPHeader(name: "Content-Type", value: "application/octet-stream")])
             )
             .validate()
             .serializingDecodable(InfomaniakResponse<RemoteFileDTO>.self, decoder: decoder)

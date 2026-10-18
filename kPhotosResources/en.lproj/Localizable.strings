@@ -258,3 +258,95 @@
 "places.status.progress" = "%@ of %@ items processed";
 
 "places.status.inProgress" = "Processing";
+
+"timeline.fastScroll" = "Fast scroll through photos";
+
+"timeline.sync.preparing" = "Preparing backup…";
+
+"timeline.sync.progress" = "Backup: %d of %d items processed";
+
+"backup.safety.incomplete" = "The backup is incomplete: a resource belonging to this photo is unavailable. Originals are preserved.";
+
+"backup.safety.integrity" = "The received content does not match the original. This item is not marked as backed up.";
+
+"backup.safety.tooLarge" = "This file exceeds the kDrive API limit of 50 GB per upload.";
+
+"backup.safety.busy" = "A backup is already running.";
+
+"backup.safety.preview" = "The preview is unavailable. Try again after kDrive finishes syncing.";
+
+"backup.safety.partial" = "Backup incomplete: %d of %d media items verified. Check the gallery errors to retry.";
+
+"timeline.cloud.loading" = "Loading kDrive photos and videos…";
+
+"backup.status.title" = "Backup";
+
+"backup.status.checking" = "Checking backup";
+
+"backup.status.saving" = "Backing up";
+
+"backup.status.waiting" = "Backup waiting";
+
+"backup.status.attention" = "Backup needs attention";
+
+"backup.status.upToDate" = "Everything is backed up";
+
+"backup.status.selectionComplete" = "Selection backed up";
+
+"backup.status.accessRequired" = "Photos access required";
+
+"backup.status.empty" = "Nothing to back up";
+
+"backup.status.checkingDetail" = "Comparing with backed up originals";
+
+"backup.status.emptyDetail" = "New photos will appear here";
+
+"backup.status.accessDetail" = "Allow Photos access to check this iPhone";
+
+"backup.status.checkFailed" = "The check could not finish";
+
+"backup.status.allSaved" = "%d items · Up to date";
+
+"backup.status.selectionSaved" = "%d selected items up to date";
+
+"backup.status.remaining" = "%d items to back up";
+
+"backup.status.savedCount" = "%d of %d items backed up";
+
+"backup.status.uploading" = "Uploading";
+
+"backup.status.queued" = "Waiting";
+
+"backup.status.retrying" = "Retry scheduled";
+
+"backup.status.failed" = "Backup failed";
+
+"backup.status.skipped" = "Skipped · Not backed up";
+
+"backup.status.unverified" = "Backup needs verification";
+
+"backup.status.queue" = "Items to back up";
+
+"backup.status.viewQueue" = "View all %d items";
+
+"backup.status.lastRun" = "Last attempt";
+
+"backup.status.automaticOn" = "Automatic backup is on.";
+
+"backup.status.automaticOff" = "Automatic backup is off. Start a backup or enable it in options.";
+
+"backup.status.selectedScope" = "This status covers only the selected media types and photos kPhotos can access.";
+
+"backup.status.lastUpload" = "Last upload";
+
+"backup.status.backgroundHelp" = "iOS decides when backup can continue in the background. Open the app to follow uploads.";
+
+"backup.status.nextAttempt" = "Retry at %@";
+
+"backup.status.automaticOffComplete" = "Automatic backup is off. Enable it in options for your next photos.";
+
+"backup.status.deviceScope" = "Photos and videos on this iPhone";
+
+"viewer.info.type.photo" = "Photo";
+
+"viewer.info.type.video" = "Video";

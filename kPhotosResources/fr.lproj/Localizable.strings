@@ -259,3 +259,95 @@
 "places.status.progress" = "%@ sur %@ éléments analysés";
 
 "places.status.inProgress" = "Analyse en cours";
+
+"timeline.fastScroll" = "Défilement rapide des photos";
+
+"timeline.sync.preparing" = "Préparation de la sauvegarde…";
+
+"timeline.sync.progress" = "Sauvegarde : %d sur %d médias traités";
+
+"backup.safety.incomplete" = "La sauvegarde est incomplète : une ressource de cette photo est indisponible. Les originaux sont conservés.";
+
+"backup.safety.integrity" = "Le contenu reçu ne correspond pas à l’original. Ce média n’est pas marqué comme sauvegardé.";
+
+"backup.safety.tooLarge" = "Ce fichier dépasse la limite de 50 Go par envoi de l’API kDrive.";
+
+"backup.safety.busy" = "Une sauvegarde est déjà en cours.";
+
+"backup.safety.preview" = "L’aperçu est indisponible. Réessayez après la synchronisation kDrive.";
+
+"backup.safety.partial" = "Sauvegarde incomplète : %d média(s) vérifié(s) sur %d. Consulte les erreurs dans la galerie pour réessayer.";
+
+"timeline.cloud.loading" = "Chargement des photos et vidéos kDrive…";
+
+"backup.status.title" = "Sauvegarde";
+
+"backup.status.checking" = "Vérification de la sauvegarde";
+
+"backup.status.saving" = "Sauvegarde en cours";
+
+"backup.status.waiting" = "Sauvegarde en attente";
+
+"backup.status.attention" = "Sauvegarde à compléter";
+
+"backup.status.upToDate" = "Tout est sauvegardé";
+
+"backup.status.selectionComplete" = "Sélection sauvegardée";
+
+"backup.status.accessRequired" = "Accès aux photos requis";
+
+"backup.status.empty" = "Aucun élément à sauvegarder";
+
+"backup.status.checkingDetail" = "Comparaison avec les originaux sauvegardés";
+
+"backup.status.emptyDetail" = "Les nouvelles photos apparaîtront ici";
+
+"backup.status.accessDetail" = "Autorisez Photos pour vérifier cet iPhone";
+
+"backup.status.checkFailed" = "La vérification n’a pas pu se terminer";
+
+"backup.status.allSaved" = "%d éléments · À jour";
+
+"backup.status.selectionSaved" = "%d éléments de la sélection à jour";
+
+"backup.status.remaining" = "%d éléments à sauvegarder";
+
+"backup.status.savedCount" = "%d sur %d éléments sauvegardés";
+
+"backup.status.uploading" = "En cours d’envoi";
+
+"backup.status.queued" = "En attente";
+
+"backup.status.retrying" = "Nouvelle tentative prévue";
+
+"backup.status.failed" = "Échec de la sauvegarde";
+
+"backup.status.skipped" = "Ignoré · Non sauvegardé";
+
+"backup.status.unverified" = "Sauvegarde à vérifier";
+
+"backup.status.queue" = "Éléments à sauvegarder";
+
+"backup.status.viewQueue" = "Voir les %d éléments";
+
+"backup.status.lastRun" = "Dernière tentative";
+
+"backup.status.automaticOn" = "La sauvegarde automatique est activée.";
+
+"backup.status.automaticOff" = "La sauvegarde automatique est désactivée. Lancez un envoi ou activez-la dans les options.";
+
+"backup.status.selectedScope" = "Ce statut concerne uniquement les types de médias choisis et les photos auxquelles kPhotos a accès.";
+
+"backup.status.lastUpload" = "Dernier envoi";
+
+"backup.status.backgroundHelp" = "En arrière-plan, iOS décide quand la sauvegarde peut continuer. Ouvrez l’app pour suivre les envois.";
+
+"backup.status.nextAttempt" = "Nouvelle tentative à %@";
+
+"backup.status.automaticOffComplete" = "La sauvegarde automatique est désactivée. Activez-la dans les options pour vos prochaines photos.";
+
+"backup.status.deviceScope" = "Photos et vidéos de cet iPhone";
+
+"viewer.info.type.photo" = "Photo";
+
+"viewer.info.type.video" = "Vidéo";

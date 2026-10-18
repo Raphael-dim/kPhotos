@@ -30,6 +30,120 @@ final class UploadTransportTests: XCTestCase {
         super.tearDown()
     }
 
+    func testLargeUploadUsesTwoHashedChunksAndPreservesCaptureDate() async throws {
+        let fixture = try UploadFixture(size: PhotoApiFetcher.chunkSize + 7)
+        defer { fixture.cleanup() }
+        var chunks: [Int] = []
+        var starts = 0
+        var finishes = 0
+        StubKDriveProtocol.handler = { request in
+            XCTAssertEqual(request.httpMethod, "POST")
+            let path = request.url!.path
+            if path.hasSuffix("/start") {
+                starts += 1
+                let body = try Self.jsonBody(request)
+                XCTAssertEqual(body["total_size"] as? Int, fixture.size)
+                XCTAssertEqual(body["total_chunks"] as? Int, 2)
+                XCTAssertEqual(body["created_at"] as? Int, 123_456_789)
+                XCTAssertEqual(body["conflict"] as? String, "error")
+                return Self.startResponse()
+            }
+            if path.hasSuffix("/chunk") {
+                let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems!
+                let params = Dictionary(uniqueKeysWithValues: query.map { ($0.name, $0.value ?? "") })
+                let number = Int(params["chunk_number"]!)!
+                let data = try Self.body(request)
+                XCTAssertEqual(data.count, number == 1 ? PhotoApiFetcher.chunkSize : 7)
+                XCTAssertEqual(params["chunk_size"], String(data.count))
+                XCTAssertEqual(
+                    params["chunk_hash"],
+                    "sha256:" + SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                )
+                XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/octet-stream")
+                chunks.append(number)
+                return ["result": "success", "data": ["result": true]]
+            }
+            XCTAssertTrue(path.hasSuffix("/finish"))
+            finishes += 1
+            XCTAssertEqual(try Self.jsonBody(request)["created_at"] as? Int, 123_456_789)
+            return Self.finishResponse(size: fixture.size)
+        }
+        let file = try await api().upload(
+            driveId: 7,
+            folderId: "42",
+            fileURL: fixture.url,
+            fileName: "video.mov",
+            createdAt: Date(timeIntervalSince1970: 123_456_789),
+            mimeType: "video/quicktime",
+            clientToken: fixture.clientToken
+        )
+        XCTAssertEqual(file.id, "123")
+        XCTAssertEqual(starts, 1)
+        XCTAssertEqual(chunks, [1, 2])
+        XCTAssertEqual(finishes, 1)
+        XCTAssertNil(try ChunkSessionStorage.read(fixture.key))
+    }
+
+    func testInterruptedUploadResumesAfterLastAcknowledgedChunk() async throws {
+        let fixture = try UploadFixture(size: PhotoApiFetcher.chunkSize + 7)
+        defer { fixture.cleanup() }
+        try ChunkSessionStorage.save(
+            ChunkUploadSession(
+                token: "session",
+                uploadURL: URL(string: "https://upload.infomaniak.com")!,
+                startedAt: Date(),
+                nextChunk: 2
+            ),
+            key: fixture.key
+        )
+        var chunks = 0
+        StubKDriveProtocol.handler = { request in
+            XCTAssertFalse(request.url!.path.hasSuffix("/start"), "A live session must be resumed")
+            if request.url!.path.hasSuffix("/chunk") {
+                chunks += 1
+                let params = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems!
+                XCTAssertEqual(params.first { $0.name == "chunk_number" }?.value, "2")
+                XCTAssertEqual(try Self.body(request).count, 7)
+                return ["result": "success", "data": ["result": true]]
+            }
+            return Self.finishResponse(size: fixture.size)
+        }
+        _ = try await api().upload(
+            driveId: 7,
+            folderId: "42",
+            fileURL: fixture.url,
+            fileName: "video.mov",
+            createdAt: Date(timeIntervalSince1970: 123_456_789),
+            mimeType: "video/quicktime",
+            clientToken: fixture.clientToken
+        )
+        XCTAssertEqual(chunks, 1)
+        XCTAssertNil(try ChunkSessionStorage.read(fixture.key))
+    }
+
+    func testFalseFinishResultCannotBeReportedAsUploaded() async throws {
+        let fixture = try UploadFixture(size: 7)
+        defer { fixture.cleanup() }
+        StubKDriveProtocol.handler = { request in
+            if request.url!.path.hasSuffix("/start") { return Self.startResponse() }
+            if request.url!.path.hasSuffix("/chunk") { return ["result": "success", "data": ["result": true]] }
+            return ["result": "success", "data": ["result": false]]
+        }
+        do {
+            _ = try await api().uploadChunked(
+                driveId: 7,
+                folderId: "42",
+                fileURL: fixture.url,
+                fileName: "video.mov",
+                createdAt: Date(),
+                totalSize: 7,
+                clientToken: fixture.clientToken
+            )
+            XCTFail("Failed finalization must not become a successful backup")
+        } catch { XCTAssertTrue(error is BackupSafetyError) }
+        XCTAssertEqual(try ChunkSessionStorage.read(fixture.key)?.nextChunk, 2)
+    }
+
     func testMissingCursorCannotCommitAnIncompleteListing() async throws {
         StubKDriveProtocol.handler = { _ in ["result": "success", "data": [], "has_more": true] }
         do {
@@ -167,6 +281,22 @@ final class UploadTransportTests: XCTestCase {
             result.append(buffer, count: bytesRead)
         }
         return result
+    }
+}
+
+private struct UploadFixture {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
+    let clientToken = UUID().uuidString
+    let size: Int
+    var key: String { MediaIntegrity.token("7:42:\(clientToken):\(size)") }
+    init(size: Int) throws {
+        self.size = size
+        try Data(repeating: 0x61, count: size).write(to: url)
+    }
+
+    func cleanup() {
+        try? FileManager.default.removeItem(at: url)
+        ChunkSessionStorage.remove(key)
     }
 }
 

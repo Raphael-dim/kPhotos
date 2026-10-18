@@ -88,6 +88,8 @@ private struct DeletionFailureSheet: Identifiable {
 
 public struct TimelineView: View {
     @StateObject private var viewModel = TimelineViewModel()
+    @State private var isShowingBackupDetails = false
+    @Environment(\.scenePhase) private var scenePhase
     @State private var detailedError: String?
     @State private var itemFailureSheet: ItemFailureSheet?
     @State private var deletionFailureSheet: DeletionFailureSheet?
@@ -184,6 +186,12 @@ public struct TimelineView: View {
                 .navigationBarTitleDisplayMode(.automatic)
                 .task { await viewModel.load() }
                 .toolbar { toolbarContent }
+                .sheet(isPresented: $isShowingBackupDetails) {
+                    BackupDetailsSheet(viewModel: viewModel)
+                }
+                .onChange(of: scenePhase) { phase in
+                    if phase == .active { viewModel.refreshLocalBackupInventory() }
+                }
                 .sheet(isPresented: $isShowingSyncOptions) {
                     SyncOptionsView()
                 }
@@ -499,51 +507,18 @@ public struct TimelineView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
+        ToolbarItem(placement: .appPrimaryAction) {
             if case .ready = viewModel.state {
-                Menu {
-                    Button {
-                        Task { await viewModel.runSync() }
-                    } label: {
-                        Label(L10n.Timeline.syncAction, systemImage: "icloud.and.arrow.up")
-                    }
-                    .disabled(isSyncing)
-
-                    // Action globale "Tout réessayer" — n'apparaît que s'il y a
-                    // au moins un `.failedPermanent` à reprendre. Le compteur
-                    // dans le titre donne la portée du clic (Google Photos
-                    // affiche aussi un compteur sur l'action bulk).
-                    if viewModel.failedItemCount > 0 {
-                        Button {
-                            Task {
-                                let n = await viewModel.retryAllFailed()
-                                if n > 0 {
-                                    presentToast(.init(
-                                        kind: .success,
-                                        message: L10n.Timeline.Backup.retriedAllToast(n),
-                                        errorDetail: nil
-                                    ))
-                                }
-                            }
-                        } label: {
-                            Label(
-                                L10n.Timeline.Backup.retryAllCount(viewModel.failedItemCount),
-                                systemImage: "arrow.clockwise.icloud"
-                            )
-                        }
-                        .disabled(isSyncing)
-                    }
-
-                    Divider()
-
-                    Button {
-                        isShowingSyncOptions = true
-                    } label: {
-                        Label(L10n.SyncOptions.title, systemImage: "gearshape")
-                    }
-                } label: {
-                    syncMenuLabel
+                Button { isShowingBackupDetails = true } label: {
+                    LibraryStatusGlyph(
+                        symbol: viewModel.backupOverview.symbol,
+                        tone: viewModel.backupOverview.tone,
+                        progress: viewModel.backupOverview.phase == .saving ? viewModel.backupOverview.fraction : nil,
+                        size: 28
+                    )
                 }
+                .accessibilityLabel(L10n.Backup.title)
+                .accessibilityValue(viewModel.backupOverview.title)
             }
         }
     }
@@ -609,17 +584,31 @@ public struct TimelineView: View {
     @ViewBuilder
     private func readyView(summary: PhotoLibrarySummary, sections: [GallerySection]) -> some View {
         if sections.isEmpty {
-            EmptyStateView(
-                systemImage: "checkmark.icloud",
-                title: L10n.Timeline.libraryTitle,
-                subtitle: L10n.Timeline.librarySubtitle(
-                    photos: summary.photosCount,
-                    videos: summary.videosCount
+            VStack {
+                libraryActivity.padding(.horizontal, 20)
+                EmptyStateView(
+                    systemImage: "checkmark.icloud",
+                    title: L10n.Timeline.libraryTitle,
+                    subtitle: L10n.Timeline.librarySubtitle(
+                        photos: summary.photosCount,
+                        videos: summary.videosCount
+                    )
                 )
-            )
+            }
         } else {
             sectionsList(sections)
         }
+    }
+
+    private var libraryActivity: some View {
+        LibraryStatusButton(
+            title: viewModel.backupOverview.title,
+            subtitle: viewModel.backupOverview.subtitle,
+            symbol: viewModel.backupOverview.symbol,
+            tone: viewModel.backupOverview.tone,
+            progress: viewModel.backupOverview.phase == .saving ? viewModel.backupOverview.fraction : nil,
+            action: { isShowingBackupDetails = true }
+        )
     }
 
     private func sectionsList(_ sections: [GallerySection]) -> some View {
@@ -636,6 +625,7 @@ public struct TimelineView: View {
             ScrollViewReader { scrollProxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: sectionSpacing) {
+                        libraryActivity.padding(.horizontal, 16)
                         // Sonde invisible placée À L'INTÉRIEUR du content de la
                         // ScrollView : on remonte la chaîne de superviews pour
                         // capter le `UIScrollView` UIKit sous-jacent à la SwiftUI

@@ -66,4 +66,18 @@ final class UploadQueueTests: XCTestCase {
 
         cancellable.cancel()
     }
+
+    func testRuntimeProgressNeverLeaksIntoAnotherLibraryScope() {
+        let queue = UploadQueueImpl()
+        queue.beginScope(driveId: 7, rootId: "one")
+        queue.mark(localIdentifier: "local", state: .uploading(fraction: 0.5))
+        queue.beginScope(driveId: 7, rootId: "one")
+        XCTAssertEqual(queue.currentStates["local"], .uploading(fraction: 0.5))
+        queue.beginScope(driveId: 7, rootId: "two")
+        XCTAssertEqual(queue.currentScope, "7:two")
+        XCTAssertTrue(queue.currentStates.isEmpty)
+        queue.mark(localIdentifier: "local", state: .pending)
+        queue.beginScope(driveId: 8, rootId: "two")
+        XCTAssertTrue(queue.currentStates.isEmpty)
+    }
 }

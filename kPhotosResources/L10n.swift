@@ -19,6 +19,71 @@
 import Foundation
 
 public enum L10n {
+    public enum BackupSafety {
+        public static let incomplete = key("backup.safety.incomplete")
+        public static let integrity = key("backup.safety.integrity")
+        public static let tooLarge = key("backup.safety.tooLarge")
+        public static let busy = key("backup.safety.busy")
+        public static let preview = key("backup.safety.preview")
+        public static func partial(completed: Int, total: Int) -> String {
+            String(format: key("backup.safety.partial"), completed, total)
+        }
+    }
+
+    public enum Backup {
+        public static let title = key("backup.status.title")
+        public static let checking = key("backup.status.checking")
+        public static let saving = key("backup.status.saving")
+        public static let waiting = key("backup.status.waiting")
+        public static let attention = key("backup.status.attention")
+        public static let upToDate = key("backup.status.upToDate")
+        public static let selectionComplete = key("backup.status.selectionComplete")
+        public static let accessRequired = key("backup.status.accessRequired")
+        public static let empty = key("backup.status.empty")
+        public static let checkingDetail = key("backup.status.checkingDetail")
+        public static let emptyDetail = key("backup.status.emptyDetail")
+        public static let accessDetail = key("backup.status.accessDetail")
+        public static let checkFailed = key("backup.status.checkFailed")
+        public static func allSaved(_ count: Int) -> String {
+            String(format: key("backup.status.allSaved"), count)
+        }
+
+        public static func selectionSaved(_ count: Int) -> String {
+            String(format: key("backup.status.selectionSaved"), count)
+        }
+
+        public static func remaining(_ count: Int) -> String {
+            String(format: key("backup.status.remaining"), count)
+        }
+
+        public static func savedCount(_ saved: Int, _ total: Int) -> String {
+            String(format: key("backup.status.savedCount"), saved, total)
+        }
+
+        public static let uploading = key("backup.status.uploading")
+        public static let queued = key("backup.status.queued")
+        public static let retrying = key("backup.status.retrying")
+        public static let failed = key("backup.status.failed")
+        public static let skipped = key("backup.status.skipped")
+        public static let unverified = key("backup.status.unverified")
+        public static let queue = key("backup.status.queue")
+        public static func viewQueue(_ count: Int) -> String {
+            String(format: key("backup.status.viewQueue"), count)
+        }
+
+        public static let lastRun = key("backup.status.lastRun")
+        public static let automaticOn = key("backup.status.automaticOn")
+        public static let automaticOff = key("backup.status.automaticOff")
+        public static let automaticOffComplete = key("backup.status.automaticOffComplete")
+        public static let deviceScope = key("backup.status.deviceScope")
+        public static let selectedScope = key("backup.status.selectedScope")
+        public static let lastUpload = key("backup.status.lastUpload")
+        public static let backgroundHelp = key("backup.status.backgroundHelp")
+        public static func nextAttempt(_ time: String) -> String {
+            String(format: key("backup.status.nextAttempt"), time)
+        }
+    }
+
     public enum Places {
         public static let inProgress = key("places.status.inProgress")
         public static func progress(_ completed: Int, _ total: Int) -> String {
@@ -101,6 +166,8 @@ public enum L10n {
     }
 
     public enum Timeline {
+        public static let cloudLoading = key("timeline.cloud.loading")
+        public static let fastScroll = key("timeline.fastScroll")
         public static let title = key("timeline.title")
         public static let emptyTitle = key("timeline.empty.title")
         public static let emptySubtitle = key("timeline.empty.subtitle")
@@ -117,6 +184,11 @@ public enum L10n {
         public static let noDriveTitle = key("timeline.noDrive.title")
         public static let noDriveSubtitle = key("timeline.noDrive.subtitle")
         public static let syncAction = key("timeline.sync.action")
+        public static let syncPreparing = key("timeline.sync.preparing")
+        public static func syncProgress(processed: Int, total: Int) -> String {
+            String(format: key("timeline.sync.progress"), processed, total)
+        }
+
         public static func syncDone(uploaded: Int) -> String {
             String(format: key("timeline.sync.done"), uploaded)
         }
@@ -309,6 +381,8 @@ public enum L10n {
         public static let selectAlbumTitle = key("viewer.selectAlbum.title")
 
         public enum Info {
+            public static let photoType = key("viewer.info.type.photo")
+            public static let videoType = key("viewer.info.type.video")
             public static let title = key("viewer.info.title")
             public static let fileSection = key("viewer.info.file.section")
             public static let dateSection = key("viewer.info.date.section")
