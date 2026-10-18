@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -123,7 +123,7 @@ public final class MediaDownloadManager: MediaDownloading {
         let (tmpURL, response) = try await URLSession.shared.download(for: request)
 
         guard let http = response as? HTTPURLResponse,
-              (200..<300).contains(http.statusCode) else {
+              (200 ..< 300).contains(http.statusCode) else {
             try? fileManager.removeItem(at: tmpURL)
             let code = (response as? HTTPURLResponse)?.statusCode ?? 0
             throw MediaDownloadError.serverError(statusCode: code)
@@ -140,8 +140,10 @@ public final class MediaDownloadManager: MediaDownloading {
         try fileManager.moveItem(at: tmpURL, to: destURL)
 
         do {
-            try await importToPhotoLibrary(fileURL: destURL,
-                                           mediaType: photo.isVideo ? .video : .image)
+            try await importToPhotoLibrary(
+                fileURL: destURL,
+                mediaType: photo.isVideo ? .video : .image
+            )
         } catch {
             try? fileManager.removeItem(at: destURL)
             throw error

@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import XCTest
 @testable import kPhotosCore
+import XCTest
 
 final class AuthTokenTests: XCTestCase {
     func testIsExpiring_trueWhenExpiryFallsWithinWindow() {
@@ -71,18 +71,24 @@ final class TokenResponseDTOTests: XCTestCase {
     }
 
     func testToAuthToken_withExpiresIn_setsExpiryRoughlyThatFarOut() throws {
-        let dto = try decoder.decode(TokenResponseDTO.self,
-                                     from: Data(#"{"access_token":"tok","expires_in":3600}"#.utf8))
+        let dto = try decoder.decode(
+            TokenResponseDTO.self,
+            from: Data(#"{"access_token":"tok","expires_in":3600}"#.utf8)
+        )
         let token = dto.toAuthToken()
         XCTAssertEqual(token.expiresAt.timeIntervalSinceNow, 3600, accuracy: 5)
     }
 
     func testToAuthToken_withoutExpiresIn_isTreatedAsNonExpiring() throws {
         // Pas de `expires_in` → token "illimité" (lifetime 10 ans).
-        let dto = try decoder.decode(TokenResponseDTO.self,
-                                     from: Data(#"{"access_token":"tok"}"#.utf8))
+        let dto = try decoder.decode(
+            TokenResponseDTO.self,
+            from: Data(#"{"access_token":"tok"}"#.utf8)
+        )
         let token = dto.toAuthToken()
-        XCTAssertFalse(token.isExpiring(within: 60 * 60 * 24 * 365),
-                       "Sans expires_in, le token ne doit pas être considéré comme expirant")
+        XCTAssertFalse(
+            token.isExpiring(within: 60 * 60 * 24 * 365),
+            "Sans expires_in, le token ne doit pas être considéré comme expirant"
+        )
     }
 }

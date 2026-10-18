@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -50,7 +50,8 @@ public struct SyncMediaFilter: OptionSet, Sendable, Hashable {
 
 /// Réglages utilisateur de synchronisation. Un seul objet (primaryKey=0).
 public final class SyncSettings: Object {
-    @Persisted(primaryKey: true) public var id: Int = 0
+    @Persisted(primaryKey: true)
+    public var id: Int = 0
 
     /// Activer la sync automatique en background (BGAppRefreshTask).
     @Persisted public var isAutoSyncEnabled: Bool = false
@@ -85,10 +86,12 @@ public struct SyncSettingsSnapshot: Equatable, Sendable {
     public var mediaFilter: SyncMediaFilter
     public var rootFolderName: String
 
-    public init(isAutoSyncEnabled: Bool,
-                networkPolicy: SyncNetworkPolicy,
-                mediaFilter: SyncMediaFilter,
-                rootFolderName: String = SyncSettingsSnapshot.defaultRootFolderName) {
+    public init(
+        isAutoSyncEnabled: Bool,
+        networkPolicy: SyncNetworkPolicy,
+        mediaFilter: SyncMediaFilter,
+        rootFolderName: String = SyncSettingsSnapshot.defaultRootFolderName
+    ) {
         self.isAutoSyncEnabled = isAutoSyncEnabled
         self.networkPolicy = networkPolicy
         self.mediaFilter = mediaFilter

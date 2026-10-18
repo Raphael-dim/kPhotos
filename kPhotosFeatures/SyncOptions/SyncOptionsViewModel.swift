@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -11,6 +11,9 @@
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 import Combine
@@ -50,13 +53,13 @@ public final class SyncOptionsViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] snapshot in
                 guard let self else { return }
-                self.isApplyingRemoteUpdate = true
-                self.isAutoSyncEnabled = snapshot.isAutoSyncEnabled
-                self.allowsWiFi = snapshot.networkPolicy.contains(.wifi)
-                self.allowsCellular = snapshot.networkPolicy.contains(.cellular)
-                self.syncsPhotos = snapshot.mediaFilter.contains(.photos)
-                self.syncsVideos = snapshot.mediaFilter.contains(.videos)
-                self.isApplyingRemoteUpdate = false
+                isApplyingRemoteUpdate = true
+                isAutoSyncEnabled = snapshot.isAutoSyncEnabled
+                allowsWiFi = snapshot.networkPolicy.contains(.wifi)
+                allowsCellular = snapshot.networkPolicy.contains(.cellular)
+                syncsPhotos = snapshot.mediaFilter.contains(.photos)
+                syncsVideos = snapshot.mediaFilter.contains(.videos)
+                isApplyingRemoteUpdate = false
             }
             .store(in: &cancellables)
 
@@ -72,11 +75,13 @@ public final class SyncOptionsViewModel: ObservableObject {
         .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
         .sink { [weak self] auto, wifi, cellular, mediaPair in
             guard let self, !self.isApplyingRemoteUpdate else { return }
-            Task { await self.persist(auto: auto,
-                                      wifi: wifi,
-                                      cellular: cellular,
-                                      photos: mediaPair.0,
-                                      videos: mediaPair.1) }
+            Task { await self.persist(
+                auto: auto,
+                wifi: wifi,
+                cellular: cellular,
+                photos: mediaPair.0,
+                videos: mediaPair.1
+            ) }
         }
         .store(in: &cancellables)
     }

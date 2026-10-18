@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -35,54 +35,66 @@ public protocol GalleryComposing: AnyObject {
     ///   pourra remplacer ce mécanisme par une observation directe de BackupItem.
     ///
     /// Pure : pas d'I/O. Synchrone. Testable sans Realm ni PhotoKit.
-    func compose(localAssets: [LocalAssetSnapshot],
-                 cloudPhotos: [PhotoSnapshot],
-                 backupItems: [String: BackupItemSnapshot],
-                 deletionItems: [String: DeletionItemSnapshot],
-                 uploadStates: [String: UploadState],
-                 calendar: Calendar) -> [GallerySection]
+    func compose(
+        localAssets: [LocalAssetSnapshot],
+        cloudPhotos: [PhotoSnapshot],
+        backupItems: [String: BackupItemSnapshot],
+        deletionItems: [String: DeletionItemSnapshot],
+        uploadStates: [String: UploadState],
+        calendar: Calendar
+    ) -> [GallerySection]
 }
 
 public extension GalleryComposing {
     /// Surcharge de compat pour les tests existants qui n'ont ni queue ni runtime —
     /// équivalent à "rien en file, rien en cours".
-    func compose(localAssets: [LocalAssetSnapshot],
-                 cloudPhotos: [PhotoSnapshot],
-                 uploadStates: [String: UploadState],
-                 calendar: Calendar) -> [GallerySection] {
-        compose(localAssets: localAssets,
-                cloudPhotos: cloudPhotos,
-                backupItems: [:],
-                deletionItems: [:],
-                uploadStates: uploadStates,
-                calendar: calendar)
+    func compose(
+        localAssets: [LocalAssetSnapshot],
+        cloudPhotos: [PhotoSnapshot],
+        uploadStates: [String: UploadState],
+        calendar: Calendar
+    ) -> [GallerySection] {
+        compose(
+            localAssets: localAssets,
+            cloudPhotos: cloudPhotos,
+            backupItems: [:],
+            deletionItems: [:],
+            uploadStates: uploadStates,
+            calendar: calendar
+        )
     }
 
     /// Surcharge de compat — appelée par les call-sites existants qui n'ont pas
     /// encore la file de suppression. À supprimer une fois le rollout terminé.
-    func compose(localAssets: [LocalAssetSnapshot],
-                 cloudPhotos: [PhotoSnapshot],
-                 backupItems: [String: BackupItemSnapshot],
-                 uploadStates: [String: UploadState],
-                 calendar: Calendar) -> [GallerySection] {
-        compose(localAssets: localAssets,
-                cloudPhotos: cloudPhotos,
-                backupItems: backupItems,
-                deletionItems: [:],
-                uploadStates: uploadStates,
-                calendar: calendar)
+    func compose(
+        localAssets: [LocalAssetSnapshot],
+        cloudPhotos: [PhotoSnapshot],
+        backupItems: [String: BackupItemSnapshot],
+        uploadStates: [String: UploadState],
+        calendar: Calendar
+    ) -> [GallerySection] {
+        compose(
+            localAssets: localAssets,
+            cloudPhotos: cloudPhotos,
+            backupItems: backupItems,
+            deletionItems: [:],
+            uploadStates: uploadStates,
+            calendar: calendar
+        )
     }
 }
 
 public final class GalleryComposerImpl: GalleryComposing {
     public init() {}
 
-    public func compose(localAssets: [LocalAssetSnapshot],
-                        cloudPhotos: [PhotoSnapshot],
-                        backupItems: [String: BackupItemSnapshot],
-                        deletionItems: [String: DeletionItemSnapshot],
-                        uploadStates: [String: UploadState],
-                        calendar: Calendar) -> [GallerySection] {
+    public func compose(
+        localAssets: [LocalAssetSnapshot],
+        cloudPhotos: [PhotoSnapshot],
+        backupItems: [String: BackupItemSnapshot],
+        deletionItems: [String: DeletionItemSnapshot],
+        uploadStates: [String: UploadState],
+        calendar: Calendar
+    ) -> [GallerySection] {
         let items = Self.merge(
             localAssets: localAssets,
             cloudPhotos: cloudPhotos,
@@ -102,11 +114,13 @@ public final class GalleryComposerImpl: GalleryComposing {
     ///    avec la file persistante (`BackupItem`), et avec l'état runtime éphémère.
     /// 3. Pour chaque cloud non rattaché à un asset local : émet un GalleryItem
     ///    `cloudOnly`.
-    static func merge(localAssets: [LocalAssetSnapshot],
-                      cloudPhotos: [PhotoSnapshot],
-                      backupItems: [String: BackupItemSnapshot],
-                      deletionItems: [String: DeletionItemSnapshot],
-                      uploadStates: [String: UploadState]) -> [GalleryItem] {
+    static func merge(
+        localAssets: [LocalAssetSnapshot],
+        cloudPhotos: [PhotoSnapshot],
+        backupItems: [String: BackupItemSnapshot],
+        deletionItems: [String: DeletionItemSnapshot],
+        uploadStates: [String: UploadState]
+    ) -> [GalleryItem] {
         var cloudByLocalId: [String: PhotoSnapshot] = [:]
         for photo in cloudPhotos where !photo.localIdentifier.isEmpty {
             cloudByLocalId[photo.localIdentifier] = photo
@@ -123,11 +137,13 @@ public final class GalleryComposerImpl: GalleryComposing {
             // a déjà été uploadé (cloud != nil). Cas typique : l'utilisateur
             // supprime une photo qui est aussi sur kDrive.
             let deletion = cloud.flatMap { deletionItems[$0.fileId] }
-            let state = resolveState(localId: asset.localIdentifier,
-                                     cloud: cloud,
-                                     backupItem: backupItems[asset.localIdentifier],
-                                     deletionItem: deletion,
-                                     uploadStates: uploadStates)
+            let state = resolveState(
+                localId: asset.localIdentifier,
+                cloud: cloud,
+                backupItem: backupItems[asset.localIdentifier],
+                deletionItem: deletion,
+                uploadStates: uploadStates
+            )
             items.append(GalleryItem(
                 id: asset.localIdentifier,
                 takenAt: asset.takenAt,
@@ -140,7 +156,7 @@ public final class GalleryComposerImpl: GalleryComposing {
         }
 
         for cloud in cloudPhotos {
-            if !cloud.localIdentifier.isEmpty && localIdsCovered.contains(cloud.localIdentifier) {
+            if !cloud.localIdentifier.isEmpty, localIdsCovered.contains(cloud.localIdentifier) {
                 continue
             }
             let deletion = deletionItems[cloud.fileId]
@@ -199,11 +215,13 @@ public final class GalleryComposerImpl: GalleryComposing {
     ///    `.queued`, `.failedPermanent`. `.skipped` est traité comme `.localOnly`
     ///    visuellement (Phase 2 pourra introduire une icône dédiée).
     /// 4. Sinon — `.localOnly`. Cas typique : asset jamais réconcilié encore.
-    static func resolveState(localId: String,
-                             cloud: PhotoSnapshot?,
-                             backupItem: BackupItemSnapshot?,
-                             deletionItem: DeletionItemSnapshot?,
-                             uploadStates: [String: UploadState]) -> GalleryItemSyncState {
+    static func resolveState(
+        localId: String,
+        cloud: PhotoSnapshot?,
+        backupItem: BackupItemSnapshot?,
+        deletionItem: DeletionItemSnapshot?,
+        uploadStates: [String: UploadState]
+    ) -> GalleryItemSyncState {
         // Suppression : priorité absolue. Si l'utilisateur a demandé à supprimer,
         // on n'affiche jamais "synced" ou "uploading" derrière — ce serait
         // mensonger et créerait un état perçu comme "annulé" alors que la

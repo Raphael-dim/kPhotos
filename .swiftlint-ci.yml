@@ -12,9 +12,6 @@ force_unwrapping:
 implicitly_unwrapped_optional:
   severity: error
 
-file_header:
-  severity: error
-
 custom_rules:
   no_raw_user_string:
     name: "Raw user-facing strings"

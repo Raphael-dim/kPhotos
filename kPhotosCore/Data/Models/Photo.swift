@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -27,7 +27,8 @@ public enum PhotoSyncStatus: String {
 }
 
 public final class Photo: Object {
-    @Persisted(primaryKey: true) public var fileId: String = ""
+    @Persisted(primaryKey: true)
+    public var fileId: String = ""
     @Persisted public var driveId: Int = 0
     @Persisted public var localIdentifier: String = ""
     @Persisted public var name: String = ""
@@ -57,7 +58,7 @@ public final class Photo: Object {
 /// Représentation thread-safe d'une `Photo`. Cf. AGENTS.md §21 (Realm thread-safety).
 /// Construite à l'intérieur d'un block Realm puis renvoyée à travers les frontières async.
 public struct PhotoSnapshot: Identifiable, Equatable, Sendable {
-    public let id: String  // == fileId, pour Identifiable
+    public let id: String // == fileId, pour Identifiable
     public let driveId: Int
     public let localIdentifier: String
     public let name: String
@@ -73,19 +74,21 @@ public struct PhotoSnapshot: Identifiable, Equatable, Sendable {
 
     public var fileId: String { id }
 
-    public init(id: String,
-                driveId: Int,
-                localIdentifier: String,
-                name: String,
-                takenAt: Date,
-                uploadedAt: Date,
-                mimeType: String,
-                size: Int64,
-                isVideo: Bool,
-                duration: Double,
-                albumIds: [String],
-                syncStatus: PhotoSyncStatus,
-                isFavorite: Bool) {
+    public init(
+        id: String,
+        driveId: Int,
+        localIdentifier: String,
+        name: String,
+        takenAt: Date,
+        uploadedAt: Date,
+        mimeType: String,
+        size: Int64,
+        isVideo: Bool,
+        duration: Double,
+        albumIds: [String],
+        syncStatus: PhotoSyncStatus,
+        isFavorite: Bool
+    ) {
         self.id = id
         self.driveId = driveId
         self.localIdentifier = localIdentifier
@@ -157,7 +160,8 @@ public enum BackupItemState: String, Sendable {
 /// le même token et le serveur retournera le fichier déjà créé au lieu d'en
 /// faire un doublon.
 public final class BackupItem: Object {
-    @Persisted(primaryKey: true) public var localIdentifier: String = ""
+    @Persisted(primaryKey: true)
+    public var localIdentifier: String = ""
     @Persisted public var stateRaw: String = BackupItemState.queued.rawValue
     @Persisted public var clientToken: String = ""
     @Persisted public var enqueuedAt: Date = .init()
@@ -212,7 +216,8 @@ public enum DeletionItemState: String, Sendable {
 /// — au lieu de laisser 150 photos zombies "supprimées côté UI mais toujours
 /// présentes côté serveur".
 public final class DeletionItem: Object {
-    @Persisted(primaryKey: true) public var fileId: String = ""
+    @Persisted(primaryKey: true)
+    public var fileId: String = ""
     @Persisted public var driveId: Int = 0
     /// `localIdentifier` du PHAsset associé, vide si aucune (cas `cloudOnly`).
     /// Conservé pour pouvoir afficher la pré-suppression dans la galerie locale
@@ -245,15 +250,17 @@ public struct DeletionItemSnapshot: Equatable, Sendable {
     public let nextRetryAt: Date?
     public let lastErrorReason: String
 
-    public init(fileId: String,
-                driveId: Int,
-                localIdentifier: String,
-                state: DeletionItemState,
-                enqueuedAt: Date,
-                attemptCount: Int,
-                lastAttemptAt: Date?,
-                nextRetryAt: Date?,
-                lastErrorReason: String) {
+    public init(
+        fileId: String,
+        driveId: Int,
+        localIdentifier: String,
+        state: DeletionItemState,
+        enqueuedAt: Date,
+        attemptCount: Int,
+        lastAttemptAt: Date?,
+        nextRetryAt: Date?,
+        lastErrorReason: String
+    ) {
         self.fileId = fileId
         self.driveId = driveId
         self.localIdentifier = localIdentifier
@@ -292,16 +299,18 @@ public struct BackupItemSnapshot: Equatable, Sendable {
     public let nextRetryAt: Date?
     public let lastErrorReason: String
 
-    public init(localIdentifier: String,
-                state: BackupItemState,
-                clientToken: String,
-                enqueuedAt: Date,
-                creationDate: Date,
-                isVideo: Bool,
-                attemptCount: Int,
-                lastAttemptAt: Date?,
-                nextRetryAt: Date?,
-                lastErrorReason: String) {
+    public init(
+        localIdentifier: String,
+        state: BackupItemState,
+        clientToken: String,
+        enqueuedAt: Date,
+        creationDate: Date,
+        isVideo: Bool,
+        attemptCount: Int,
+        lastAttemptAt: Date?,
+        nextRetryAt: Date?,
+        lastErrorReason: String
+    ) {
         self.localIdentifier = localIdentifier
         self.state = state
         self.clientToken = clientToken

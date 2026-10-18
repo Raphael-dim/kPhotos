@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import XCTest
 @testable import kPhotosCore
+import XCTest
 
 /// Tests du parser `recoverLocalIdentifier` — clé de la Phase 2 du fix dédup :
 /// récupérer le PHAsset id depuis le nom de fichier quand le record Realm a perdu

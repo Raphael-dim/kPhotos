@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -26,9 +26,11 @@ public final class AuthInterceptor: RequestInterceptor, @unchecked Sendable {
         self.auth = auth
     }
 
-    public func adapt(_ urlRequest: URLRequest,
-                      for session: Session,
-                      completion: @escaping (Result<URLRequest, Error>) -> Void) {
+    public func adapt(
+        _ urlRequest: URLRequest,
+        for session: Session,
+        completion: @escaping (Result<URLRequest, Error>) -> Void
+    ) {
         Task {
             do {
                 let token = try await auth.currentAccessToken()
@@ -41,10 +43,12 @@ public final class AuthInterceptor: RequestInterceptor, @unchecked Sendable {
         }
     }
 
-    public func retry(_ request: Request,
-                      for session: Session,
-                      dueTo error: Error,
-                      completion: @escaping (RetryResult) -> Void) {
+    public func retry(
+        _ request: Request,
+        for session: Session,
+        dueTo error: Error,
+        completion: @escaping (RetryResult) -> Void
+    ) {
         guard let response = request.task?.response as? HTTPURLResponse,
               response.statusCode == 401,
               request.retryCount < 1 else {

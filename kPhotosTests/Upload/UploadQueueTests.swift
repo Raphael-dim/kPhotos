@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -17,8 +17,8 @@
  */
 
 import Combine
-import XCTest
 @testable import kPhotosCore
+import XCTest
 
 /// File d'upload runtime in-memory — état éphémère superposé aux tuiles.
 final class UploadQueueTests: XCTestCase {

@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -176,8 +176,8 @@ public final class DriveManagerImpl: DriveManaging {
     }
 
     private static func isDestinationAlreadyExists(_ error: PhotoAPIError) -> Bool {
-        guard case .server(let code, let message) = error, code == 400 else { return false }
-        return message?.contains("destination_already_exists") == true
+        guard case .server(let code, _) = error else { return false }
+        return code == 400 || code == 409
     }
 
     private func findChildDirectory(driveId: Int, parentId: String, name: String) async throws -> String? {

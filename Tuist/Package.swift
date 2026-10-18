@@ -2,7 +2,7 @@
 
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -22,12 +22,25 @@ import PackageDescription
 
 #if TUIST
 import struct ProjectDescription.PackageSettings
+import struct ProjectDescription.Settings
 
+let packageDeploymentSettings: Settings = .settings(base: ["IPHONEOS_DEPLOYMENT_TARGET": "16.6"])
 let packageSettings = PackageSettings(
     productTypes: [
         "RealmSwift": .framework,
         "Realm": .framework,
         "Alamofire": .framework
+    ],
+    baseSettings: packageDeploymentSettings,
+    // Xcode 27 rejects the iOS 12 target inherited from these package manifests.
+    targetSettings: [
+        "Alamofire": packageDeploymentSettings,
+        "Realm": packageDeploymentSettings,
+        "RealmSwift": packageDeploymentSettings,
+        "RealmCore": packageDeploymentSettings,
+        "RealmCoreResources": packageDeploymentSettings,
+        "Bid": packageDeploymentSettings,
+        "s2geometry": packageDeploymentSettings
     ]
 )
 #endif

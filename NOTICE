@@ -1,5 +1,5 @@
 kPhotos
-Copyright (C) 2025 Raphaël Dimeck
+Copyright (C) 2026 Raphaël Dimeck
 
 This program is licensed under the GNU General Public License v3.0
 (see LICENSE for the full text).
@@ -28,5 +28,9 @@ This program incorporates the following third-party libraries:
 
 - Realm Swift — Apache License 2.0
   https://github.com/realm/realm-swift
+
+- Realm Core (transitive) — Apache License 2.0 and bundled third-party notices
+  https://github.com/realm/realm-core
+  Preserve the upstream third-party notices when distributing binaries.
 
 Their respective license texts apply to those components.

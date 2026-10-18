@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -79,6 +79,7 @@ public enum L10n {
         public static func librarySubtitle(photos: Int, videos: Int) -> String {
             String(format: key("timeline.library.subtitle"), photos, videos)
         }
+
         public static let permissionTitle = key("timeline.permission.title")
         public static let permissionSubtitle = key("timeline.permission.subtitle")
         public static let permissionAction = key("timeline.permission.action")
@@ -90,12 +91,15 @@ public enum L10n {
         public static func syncDone(uploaded: Int) -> String {
             String(format: key("timeline.sync.done"), uploaded)
         }
+
         public static func sectionCount(count: Int) -> String {
             String(format: key("timeline.section.count"), count)
         }
+
         public static func sectionMore(count: Int) -> String {
             String(format: key("timeline.section.more"), count)
         }
+
         public static let errorDetailTitle = key("timeline.error.detail.title")
 
         public enum Backup {
@@ -106,6 +110,7 @@ public enum L10n {
             public static func retryAllCount(_ count: Int) -> String {
                 String(format: key("timeline.backup.retryAll.count"), count)
             }
+
             public static func retriedAllToast(_ count: Int) -> String {
                 String(format: key("timeline.backup.retriedAll.toast"), count)
             }
@@ -116,16 +121,20 @@ public enum L10n {
             public static func deleteMessage(count: Int) -> String {
                 String(format: key("timeline.selection.delete.message"), count)
             }
+
             public static let deleted = key("timeline.selection.deleted")
             public static func deletedCount(count: Int) -> String {
                 String(format: key("timeline.selection.deletedCount"), count)
             }
+
             public static func deleting(count: Int) -> String {
                 String(format: key("timeline.selection.deleting"), count)
             }
+
             public static func addedToAlbum(album: String) -> String {
                 String(format: key("timeline.selection.addedToAlbum"), album)
             }
+
             public static func downloadedToLibrary(count: Int) -> String {
                 String(format: key("timeline.selection.downloadedToLibrary"), count)
             }
@@ -135,6 +144,7 @@ public enum L10n {
             public static func failedToast(_ count: Int) -> String {
                 String(format: key("timeline.deletion.failed.toast"), count)
             }
+
             public static let failureTitle = key("timeline.deletion.failure.title")
             public static let retryItem = key("timeline.deletion.retryItem")
             public static let cancelItem = key("timeline.deletion.cancelItem")
@@ -217,6 +227,7 @@ public enum L10n {
         public static func subtitle(count: Int) -> String {
             String(format: key("map.subtitle"), count)
         }
+
         public static let loading = key("map.loading")
         public static let emptyTitle = key("map.empty.title")
         public static let emptySubtitle = key("map.empty.subtitle")
@@ -228,6 +239,7 @@ public enum L10n {
         public static func sheetTitle(count: Int) -> String {
             String(format: key("map.sheet.title"), count)
         }
+
         public static let placesSectionTitle = key("map.places.section.title")
         public static func placeItemsCount(count: Int) -> String {
             String(format: key("map.places.items.count"), count)

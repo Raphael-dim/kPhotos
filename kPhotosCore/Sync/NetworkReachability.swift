@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -23,7 +23,7 @@ public enum NetworkKind: Equatable, Sendable {
     case offline
     case wifi
     case cellular
-    case other          // ethernet, loopback, etc. — traité comme du wifi pour la sync.
+    case other // ethernet, loopback, etc. — traité comme du wifi pour la sync.
 }
 
 public protocol NetworkReachable: AnyObject {
@@ -47,9 +47,9 @@ public final class NetworkReachabilityImpl: NetworkReachable {
         monitor.pathUpdateHandler = { [weak self] path in
             guard let self else { return }
             let kind = Self.classify(path)
-            self.lock.lock()
+            lock.lock()
             self.cached = kind
-            self.lock.unlock()
+            lock.unlock()
         }
         monitor.start(queue: queue)
     }

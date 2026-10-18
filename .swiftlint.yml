@@ -73,6 +73,9 @@ opt_in_rules:
   - vertical_whitespace_closing_braces
   - yoda_condition
 
+attributes:
+  always_on_same_line: ["@IBAction", "@NSManaged", "@Environment", "@AppStorage", "@SceneStorage"]
+
 line_length:
   warning: 130
   error: 160
@@ -133,10 +136,11 @@ type_name:
     error: 70
 
 file_header:
-  required_pattern: |
+  severity: error
+  required_pattern: |-
                     \/\*
-                     Infomaniak kPhotos - iOS App
-                     Copyright \(C\) \d{4} Infomaniak Network SA
+                     kPhotos - iOS client for kDrive
+                     Copyright \(C\) 2026 Raphaël Dimeck
                     [\s\S]*?
                      \*\/
 

@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@ public extension PhotoApiFetcher {
         let endpoint = Endpoint.categories(driveId: driveId)
         return try await performWithRetry { [weak self] in
             guard let self else { throw PhotoAPIError.network(underlying: "fetcher deallocated") }
-            return try await self.requestJSON(endpoint: endpoint, method: .get)
+            return try await requestJSON(endpoint: endpoint, method: .get)
         }
     }
 
@@ -38,7 +38,7 @@ public extension PhotoApiFetcher {
 
         return try await performWithRetry { [weak self] in
             guard let self else { throw PhotoAPIError.network(underlying: "fetcher deallocated") }
-            return try await self.requestJSON(endpoint: endpoint, method: .post, parameters: payload)
+            return try await requestJSON(endpoint: endpoint, method: .post, parameters: payload)
         }
     }
 
@@ -50,7 +50,7 @@ public extension PhotoApiFetcher {
 
         return try await performWithRetry { [weak self] in
             guard let self else { throw PhotoAPIError.network(underlying: "fetcher deallocated") }
-            return try await self.requestJSON(endpoint: endpoint, method: .put, parameters: payload)
+            return try await requestJSON(endpoint: endpoint, method: .put, parameters: payload)
         }
     }
 
@@ -58,7 +58,7 @@ public extension PhotoApiFetcher {
         let endpoint = Endpoint.category(driveId: driveId, categoryId: categoryId)
         _ = try await performWithRetry { [weak self] in
             guard let self else { throw PhotoAPIError.network(underlying: "fetcher deallocated") }
-            return try await self.requestEmpty(endpoint: endpoint, method: .delete)
+            return try await requestEmpty(endpoint: endpoint, method: .delete)
         }
     }
 
@@ -72,7 +72,7 @@ public extension PhotoApiFetcher {
 
         _ = try await performWithRetry { [weak self] in
             guard let self else { throw PhotoAPIError.network(underlying: "fetcher deallocated") }
-            return try await self.requestEmpty(endpoint: endpoint, method: .post, parameters: payload)
+            return try await requestEmpty(endpoint: endpoint, method: .post, parameters: payload)
         }
     }
 
@@ -83,36 +83,42 @@ public extension PhotoApiFetcher {
 
         _ = try await performWithRetry { [weak self] in
             guard let self else { throw PhotoAPIError.network(underlying: "fetcher deallocated") }
-            return try await self.requestEmpty(endpoint: endpoint, method: .delete, parameters: payload)
+            return try await requestEmpty(endpoint: endpoint, method: .delete, parameters: payload)
         }
     }
 
     // MARK: - Listing des fichiers d'une catégorie (paginé v3)
 
-    func listCategoryFiles(driveId: Int,
-                           categoryId: Int,
-                           cursor: String? = nil,
-                           limit: Int = 100) async throws -> FilePage {
+    func listCategoryFiles(
+        driveId: Int,
+        categoryId: Int,
+        cursor: String? = nil,
+        limit: Int = 100
+    ) async throws -> FilePage {
         let endpoint = Endpoint.categoryFiles(driveId: driveId, categoryId: categoryId, cursor: cursor, limit: limit)
         return try await performWithRetry { [weak self] in
             guard let self else { throw PhotoAPIError.network(underlying: "fetcher deallocated") }
-            return try await self.requestList(endpoint: endpoint)
+            return try await requestList(endpoint: endpoint)
         }
     }
 
     // MARK: - Internals
 
-    internal func requestJSON<T: Decodable>(endpoint: Endpoint,
-                                           method: HTTPMethod,
-                                           parameters: [String: Any]? = nil) async throws -> T {
+    internal func requestJSON<T: Decodable>(
+        endpoint: Endpoint,
+        method: HTTPMethod,
+        parameters: [String: Any]? = nil
+    ) async throws -> T {
         APILog.request(method: method.rawValue, url: endpoint.url, body: parameters)
-        let decoder = self.decoder
+        let decoder = decoder
         let request: DataRequest
         if let parameters {
-            request = session.request(endpoint.url,
-                                      method: method,
-                                      parameters: parameters,
-                                      encoding: JSONEncoding.default)
+            request = session.request(
+                endpoint.url,
+                method: method,
+                parameters: parameters,
+                encoding: JSONEncoding.default
+            )
         } else {
             request = session.request(endpoint.url, method: method)
         }
@@ -126,24 +132,30 @@ public extension PhotoApiFetcher {
             return value.data
         }
         if let error = response.error {
-            throw Self.mapAFError(error,
-                                  statusCode: response.response?.statusCode,
-                                  url: endpoint.url,
-                                  body: response.data)
+            throw Self.mapAFError(
+                error,
+                statusCode: response.response?.statusCode,
+                url: endpoint.url,
+                body: response.data
+            )
         }
         throw PhotoAPIError.invalidResponse
     }
 
-    internal func requestEmpty(endpoint: Endpoint,
-                              method: HTTPMethod,
-                              parameters: [String: Any]? = nil) async throws -> Bool {
+    internal func requestEmpty(
+        endpoint: Endpoint,
+        method: HTTPMethod,
+        parameters: [String: Any]? = nil
+    ) async throws -> Bool {
         APILog.request(method: method.rawValue, url: endpoint.url, body: parameters)
         let request: DataRequest
         if let parameters {
-            request = session.request(endpoint.url,
-                                      method: method,
-                                      parameters: parameters,
-                                      encoding: JSONEncoding.default)
+            request = session.request(
+                endpoint.url,
+                method: method,
+                parameters: parameters,
+                encoding: JSONEncoding.default
+            )
         } else {
             request = session.request(endpoint.url, method: method)
         }
@@ -157,12 +169,13 @@ public extension PhotoApiFetcher {
             return true
         }
         if let error = response.error {
-            throw Self.mapAFError(error,
-                                  statusCode: response.response?.statusCode,
-                                  url: endpoint.url,
-                                  body: response.data)
+            throw Self.mapAFError(
+                error,
+                statusCode: response.response?.statusCode,
+                url: endpoint.url,
+                body: response.data
+            )
         }
         return false
     }
-
 }

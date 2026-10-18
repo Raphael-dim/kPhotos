@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -11,6 +11,9 @@
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 import Photos
@@ -46,7 +49,7 @@ public final class LocalThumbnailLoader: ObservableObject {
 
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
-        options.isNetworkAccessAllowed = false  // iCloud Photo Library : on garde local-only.
+        options.isNetworkAccessAllowed = false // iCloud Photo Library : on garde local-only.
         options.resizeMode = .fast
 
         requestID = LocalThumbnailCacheController.sharedManager.requestImage(
@@ -60,12 +63,12 @@ public final class LocalThumbnailLoader: ObservableObject {
             // On accepte chaque résultat non-`isDegraded` final, et on prend le low-res
             // comme placeholder immédiat.
             if let result {
-                self.image = result
+                image = result
             }
             // Quand la dernière image arrive, on libère le requestID.
             let degraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
             if !degraded {
-                self.requestID = nil
+                requestID = nil
             }
         }
     }

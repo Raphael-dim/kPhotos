@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -11,6 +11,9 @@
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 import CoreLocation
@@ -22,7 +25,7 @@ import kPhotosCore
 /// et on reconstruit la `CLLocationCoordinate2D` au moment d'instancier les
 /// `MKAnnotation`.
 public struct PhotoMapPoint: Identifiable, Equatable, Sendable {
-    public let id: String  // == fileId, pour Identifiable
+    public let id: String // == fileId, pour Identifiable
     public let photo: PhotoSnapshot
     public let latitude: Double
     public let longitude: Double
@@ -40,7 +43,7 @@ public struct PhotoMapPoint: Identifiable, Equatable, Sendable {
 /// Le `placeName` est résolu asynchroniquement via CLGeocoder — il peut rester
 /// nil pendant quelques secondes après le `load()`.
 public struct PlaceGroup: Identifiable, Equatable, Sendable {
-    public let id: String  // hash stable du centre arrondi
+    public let id: String // hash stable du centre arrondi
     public let centerLatitude: Double
     public let centerLongitude: Double
     public let photos: [PhotoSnapshot]

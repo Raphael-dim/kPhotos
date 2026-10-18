@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -63,11 +63,13 @@ public extension Endpoint {
     /// Endpoint preview kDrive. Sans paramètres, retourne un preview "par défaut"
     /// (petit, suffisant pour des vignettes). Avec `width`/`height`/`quality`,
     /// on récupère un preview HD adapté au plein écran.
-    static func preview(driveId: Int,
-                        fileId: String,
-                        width: Int? = nil,
-                        height: Int? = nil,
-                        quality: Int? = nil) -> Endpoint {
+    static func preview(
+        driveId: Int,
+        fileId: String,
+        width: Int? = nil,
+        height: Int? = nil,
+        quality: Int? = nil
+    ) -> Endpoint {
         var items: [URLQueryItem] = []
         if let width { items.append(URLQueryItem(name: "width", value: String(width))) }
         if let height { items.append(URLQueryItem(name: "height", value: String(height))) }

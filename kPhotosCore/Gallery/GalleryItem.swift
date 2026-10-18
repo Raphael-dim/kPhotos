@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -61,13 +61,15 @@ public struct GalleryItem: Identifiable, Equatable, Sendable {
     public let cloudDriveId: Int?
     public let syncState: GalleryItemSyncState
 
-    public init(id: String,
-                takenAt: Date,
-                isVideo: Bool,
-                localAssetIdentifier: String?,
-                cloudFileId: String?,
-                cloudDriveId: Int?,
-                syncState: GalleryItemSyncState) {
+    public init(
+        id: String,
+        takenAt: Date,
+        isVideo: Bool,
+        localAssetIdentifier: String?,
+        cloudFileId: String?,
+        cloudDriveId: Int?,
+        syncState: GalleryItemSyncState
+    ) {
         self.id = id
         self.takenAt = takenAt
         self.isVideo = isVideo

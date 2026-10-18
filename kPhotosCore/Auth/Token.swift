@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -67,17 +67,17 @@ struct TokenResponseDTO: Decodable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        accessToken = try c.decode(String.self, forKey: .accessToken)
-        tokenType = try c.decodeIfPresent(String.self, forKey: .tokenType)
-        expiresIn = try c.decodeIfPresent(Int.self, forKey: .expiresIn)
-        refreshToken = try c.decodeIfPresent(String.self, forKey: .refreshToken)
-        scope = try c.decodeIfPresent(String.self, forKey: .scope)
+        self.accessToken = try c.decode(String.self, forKey: .accessToken)
+        self.tokenType = try c.decodeIfPresent(String.self, forKey: .tokenType)
+        self.expiresIn = try c.decodeIfPresent(Int.self, forKey: .expiresIn)
+        self.refreshToken = try c.decodeIfPresent(String.self, forKey: .refreshToken)
+        self.scope = try c.decodeIfPresent(String.self, forKey: .scope)
         if let intId = try? c.decodeIfPresent(Int.self, forKey: .userId) {
-            userId = intId
+            self.userId = intId
         } else if let stringId = try? c.decodeIfPresent(String.self, forKey: .userId) {
-            userId = Int(stringId)
+            self.userId = Int(stringId)
         } else {
-            userId = nil
+            self.userId = nil
         }
     }
 

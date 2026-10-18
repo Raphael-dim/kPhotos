@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -64,7 +64,7 @@ let featuresTarget = TargetFactory.framework(
 
 let appTarget = TargetFactory.app(
     name: "kPhotos",
-    bundleId: Constants.bundleIdentifierPrefix,
+    bundleId: Constants.appBundleIdentifier,
     infoPlist: .extendingDefault(with: [
         "CFBundleDisplayName": "kPhotos",
         "CFBundleShortVersionString": .string(Constants.marketingVersion),

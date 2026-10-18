@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -54,7 +54,7 @@ public final class SettingsViewModel: ObservableObject {
             .sink { [weak self] snapshot in
                 guard let self else { return }
                 self.lastPersistedFolderName = snapshot.rootFolderName
-                if self.rootFolderName != snapshot.rootFolderName {
+                if rootFolderName != snapshot.rootFolderName {
                     self.rootFolderName = snapshot.rootFolderName
                 }
             }

@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -11,6 +11,9 @@
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 import AVFoundation
@@ -90,7 +93,7 @@ public struct FullscreenMediaView: View {
     private var windowIndices: [Int] {
         let lower = max(0, currentIndex - 1)
         let upper = min(media.count - 1, currentIndex + 1)
-        return Array(lower...upper)
+        return Array(lower ... upper)
     }
 
     public var body: some View {
@@ -435,9 +438,8 @@ public struct FullscreenMediaView: View {
         guard let windowScene = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
             .first(where: { $0.activationState == .foregroundActive }),
-              let window = windowScene.windows.first(where: { $0.isKeyWindow }),
-              let rootVC = window.rootViewController
-        else { return }
+            let window = windowScene.windows.first(where: { $0.isKeyWindow }),
+            let rootVC = window.rootViewController else { return }
 
         let items: [Any] = [currentMedia.takenAt]
         let vc = UIActivityViewController(activityItems: items, applicationActivities: nil)
@@ -535,7 +537,7 @@ private struct DownloadToastBanner: View {
 
     private var message: String {
         switch toast {
-        case .success:         return L10n.Viewer.saveToLibrarySuccess
+        case .success: return L10n.Viewer.saveToLibrarySuccess
         case .failure(let msg): return msg
         }
     }
@@ -679,9 +681,9 @@ private final class PhotoInfoViewModel: ObservableObject {
             return nil
         }
         let parts = [
-            placemark.name,         // ex: "Tour Eiffel" ou "5 Avenue Anatole France"
-            placemark.locality,     // ville
-            placemark.country       // pays
+            placemark.name, // ex: "Tour Eiffel" ou "5 Avenue Anatole France"
+            placemark.locality, // ville
+            placemark.country // pays
         ].compactMap { $0 }.filter { !$0.isEmpty }
         // Dédup : `name` peut déjà contenir la ville
         var seen = Set<String>()
@@ -723,7 +725,7 @@ private final class PhotoInfoViewModel: ObservableObject {
 
         let url: URL? = await withCheckedContinuation { continuation in
             let options = PHContentEditingInputRequestOptions()
-            options.isNetworkAccessAllowed = false   // jamais de download iCloud — métadonnées only
+            options.isNetworkAccessAllowed = false // jamais de download iCloud — métadonnées only
             options.canHandleAdjustmentData = { _ in false }
             asset.requestContentEditingInput(with: options) { input, _ in
                 continuation.resume(returning: input?.fullSizeImageURL)
@@ -733,16 +735,14 @@ private final class PhotoInfoViewModel: ObservableObject {
 
         let cgOptions = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithURL(url as CFURL, cgOptions),
-              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any]
-        else { return nil }
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else { return nil }
         return parseExif(properties: props)
     }
 
     nonisolated static func parseExif(from data: Data) -> ExifMetadata? {
         let options = [kCGImageSourceShouldCache: false] as CFDictionary
         guard let source = CGImageSourceCreateWithData(data as CFData, options),
-              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any]
-        else { return nil }
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else { return nil }
         return parseExif(properties: props)
     }
 
@@ -849,11 +849,13 @@ private struct LocationSection: View {
                     Text(name)
                         .font(.subheadline.weight(.medium))
                 }
-                Text(String(format: "%.5f, %.5f",
-                            location.coordinate.latitude,
-                            location.coordinate.longitude))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    format: "%.5f, %.5f",
+                    location.coordinate.latitude,
+                    location.coordinate.longitude
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
                 Button {
                     openInMaps()
                 } label: {
@@ -916,7 +918,7 @@ private struct CloudPhotoInfoView: View {
         }
         .task { await vm.load() }
         .overlay {
-            if vm.isLoading && vm.fileDetail == nil {
+            if vm.isLoading, vm.fileDetail == nil {
                 ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .padding()
             }
@@ -1022,8 +1024,10 @@ private struct LocalPhotoInfoView: View {
         Section(L10n.Viewer.Info.fileSection) {
             InfoRow(label: L10n.Viewer.Info.type, value: asset.isVideo ? "Vidéo" : "Photo")
             if let width = vm.pixelWidth, let height = vm.pixelHeight {
-                InfoRow(label: L10n.Viewer.Info.resolution,
-                        value: InfoFormat.resolution(width: width, height: height))
+                InfoRow(
+                    label: L10n.Viewer.Info.resolution,
+                    value: InfoFormat.resolution(width: width, height: height)
+                )
             }
         }
     }
@@ -1189,11 +1193,13 @@ private struct MediaPageView: View {
 
     @StateObject private var loader: MediaPageLoader
 
-    init(media: ViewerMedia,
-         isActive: Bool,
-         safeArea: EdgeInsets,
-         onSingleTap: @escaping () -> Void,
-         onZoomChange: @escaping (Bool) -> Void) {
+    init(
+        media: ViewerMedia,
+        isActive: Bool,
+        safeArea: EdgeInsets,
+        onSingleTap: @escaping () -> Void,
+        onZoomChange: @escaping (Bool) -> Void
+    ) {
         self.media = media
         self.isActive = isActive
         self.safeArea = safeArea
@@ -1304,11 +1310,11 @@ private final class MediaPageLoader: ObservableObject {
         let key = "\(photo.driveId)-\(photo.fileId)"
         if let cached = ThumbnailCache.shared.image(forKey: key)
             ?? ThumbnailCache.shared.diskImage(forKey: key) {
-            self.image = cached
+            image = cached
         }
         if let highRes = PreviewCache.shared.image(forKey: key) {
-            self.image = highRes
-            self.didLoadPreview = true
+            image = highRes
+            didLoadPreview = true
         }
     }
 
@@ -1402,7 +1408,7 @@ private final class MediaPageLoader: ObservableObject {
     /// renvoie l'asset à sa taille native — le `ZoomableScrollView` se chargera
     /// du fit à l'écran. `isNetworkAccessAllowed = true` couvre les assets stockés
     /// dans iCloud Photo Library (photo qui n'a pas encore retéléchargé localement).
-    nonisolated private static func requestImage(for asset: PHAsset) async -> UIImage? {
+    private nonisolated static func requestImage(for asset: PHAsset) async -> UIImage? {
         await withCheckedContinuation { (continuation: CheckedContinuation<UIImage?, Never>) in
             let options = PHImageRequestOptions()
             options.deliveryMode = .highQualityFormat
@@ -1423,7 +1429,7 @@ private final class MediaPageLoader: ObservableObject {
         }
     }
 
-    nonisolated private static func requestPlayerItem(for asset: PHAsset) async -> AVPlayerItem? {
+    private nonisolated static func requestPlayerItem(for asset: PHAsset) async -> AVPlayerItem? {
         await withCheckedContinuation { (continuation: CheckedContinuation<AVPlayerItem?, Never>) in
             let options = PHVideoRequestOptions()
             options.deliveryMode = .automatic
@@ -1495,11 +1501,13 @@ private struct ZoomableScrollView: UIViewRepresentable {
             onZoomChange(scrollView.zoomScale > 1.01)
         }
 
-        @objc func handleSingleTap() {
+        @objc
+        func handleSingleTap() {
             onSingleTap()
         }
 
-        @objc func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
+        @objc
+        func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
             guard let scrollView = container?.scrollView,
                   let imageView = container?.imageView else { return }
             if scrollView.zoomScale > 1 {
@@ -1531,6 +1539,7 @@ private final class ScrollContainer: UIView {
         backgroundColor = .black
     }
 
+    @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
 
     func configure(image: UIImage, coordinator: ZoomableScrollView.Coordinator) {
@@ -1611,17 +1620,17 @@ private extension View {
     /// connaît `glassEffect` que si on build avec le SDK iOS 26+ ; on garde donc
     /// la branche en `#if compiler(>=6.2)` (Swift 6.2 = Xcode 26 = SDK iOS 26).
     @ViewBuilder
-    func glassPill<S: InsettableShape>(in shape: S) -> some View {
-#if compiler(>=6.2)
+    func glassPill(in shape: some InsettableShape) -> some View {
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             self.glassEffect(.regular, in: shape)
         } else {
-            self.background(.ultraThinMaterial, in: shape)
+            background(.ultraThinMaterial, in: shape)
                 .overlay(shape.strokeBorder(.white.opacity(0.18), lineWidth: 0.5))
         }
-#else
-        self.background(.ultraThinMaterial, in: shape)
+        #else
+        background(.ultraThinMaterial, in: shape)
             .overlay(shape.strokeBorder(.white.opacity(0.18), lineWidth: 0.5))
-#endif
+        #endif
     }
 }

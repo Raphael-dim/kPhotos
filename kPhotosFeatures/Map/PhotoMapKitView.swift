@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -11,6 +11,9 @@
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 import CoreLocation
@@ -176,6 +179,7 @@ final class PhotoAnnotationView: MKAnnotationView {
         setupChrome()
     }
 
+    @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     private func setupChrome() {
@@ -219,9 +223,8 @@ final class PhotoAnnotationView: MKAnnotationView {
                 await MainActor.run { [weak self] in
                     // Vérifie qu'on n'a pas été recyclé sur une autre photo.
                     guard let self,
-                          (self.annotation as? PhotoAnnotation)?.photo.fileId == photo.fileId
-                    else { return }
-                    self.imageView.image = disk
+                          (self.annotation as? PhotoAnnotation)?.photo.fileId == photo.fileId else { return }
+                    imageView.image = disk
                 }
             }
         }
@@ -247,6 +250,7 @@ final class PhotoClusterAnnotationView: MKAnnotationView {
         setupChrome()
     }
 
+    @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     private func setupChrome() {
@@ -287,10 +291,10 @@ final class PhotoClusterAnnotationView: MKAnnotationView {
     }
 
     func configure(with cluster: MKClusterAnnotation) {
-        self.annotation = cluster
+        annotation = cluster
         let count = cluster.memberAnnotations.count
         // Format compact pour gros groupes : 1k, 10k…
-        countBadge.text = count < 1_000 ? "\(count)" : "\(count / 1_000)k+"
+        countBadge.text = count < 1000 ? "\(count)" : "\(count / 1000)k+"
 
         // Vignette : la photo la plus récente du cluster, pour avoir un aperçu
         // pertinent (les vieilles photos floues sont moins représentatives).
@@ -313,12 +317,11 @@ final class PhotoClusterAnnotationView: MKAnnotationView {
                     ThumbnailCache.shared.store(disk, forKey: key)
                     await MainActor.run { [weak self] in
                         guard let self,
-                              let cluster = self.annotation as? MKClusterAnnotation,
+                              let cluster = annotation as? MKClusterAnnotation,
                               cluster.memberAnnotations
-                                  .compactMap({ ($0 as? PhotoAnnotation)?.photo })
-                                  .max(by: { $0.takenAt < $1.takenAt })?.fileId == photo.fileId
-                        else { return }
-                        self.imageView.image = disk
+                              .compactMap({ ($0 as? PhotoAnnotation)?.photo })
+                              .max(by: { $0.takenAt < $1.takenAt })?.fileId == photo.fileId else { return }
+                        imageView.image = disk
                     }
                 }
             }

@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -701,8 +701,7 @@ public struct TimelineView: View {
                     let threshold: CGFloat = -90
                     if let current = positions
                         .filter({ $0.value < threshold })
-                        .max(by: { $0.value < $1.value })
-                    {
+                        .max(by: { $0.value < $1.value }) {
                         navigationTitle = current.key
                     } else {
                         navigationTitle = L10n.Timeline.title
@@ -805,8 +804,8 @@ public struct TimelineView: View {
     private var sectionTitleFont: Font {
         switch columnCount {
         case ...1: return .title.weight(.bold)
-        case 2...3: return .title3.weight(.semibold)
-        case 4...5: return .subheadline.weight(.semibold)
+        case 2 ... 3: return .title3.weight(.semibold)
+        case 4 ... 5: return .subheadline.weight(.semibold)
         default: return .caption.weight(.bold)
         }
     }
@@ -815,8 +814,8 @@ public struct TimelineView: View {
     private var sectionSpacing: CGFloat {
         switch columnCount {
         case ...1: return 28
-        case 2...3: return 20
-        case 4...5: return 14
+        case 2 ... 3: return 20
+        case 4 ... 5: return 14
         default: return 8
         }
     }
@@ -1033,7 +1032,7 @@ public struct TimelineView: View {
               let currentIdx = ordered.firstIndex(of: hitTile) else { return }
         let lo = min(anchorIdx, currentIdx)
         let hi = max(anchorIdx, currentIdx)
-        let rangeIds = Set(ordered[lo...hi])
+        let rangeIds = Set(ordered[lo ... hi])
         viewModel.setSelection(ids: dragSelectInitialSelection.union(rangeIds))
     }
 
@@ -1189,8 +1188,10 @@ private struct CircularSyncIndicator: View {
             Circle()
                 // Min 0.05 pour garder un repère visuel dès le début de la sync.
                 .trim(from: 0, to: max(0.05, progress))
-                .stroke(Color.accentColor,
-                        style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                .stroke(
+                    Color.accentColor,
+                    style: StrokeStyle(lineWidth: 2, lineCap: .round)
+                )
                 .rotationEffect(.degrees(-90))
                 .animation(.easeOut(duration: 0.3), value: progress)
         }
@@ -1493,7 +1494,7 @@ private extension UIView {
     /// Remonte la chaîne `superview` jusqu'à trouver un `UIScrollView`.
     /// `nil` si aucun ancêtre n'en est un (cas pathologique d'une vue détachée).
     func enclosingScrollView() -> UIScrollView? {
-        var node: UIView? = self.superview
+        var node: UIView? = superview
         while let current = node {
             if let scrollView = current as? UIScrollView {
                 return scrollView
@@ -1587,7 +1588,8 @@ private struct PinchZoomDetector: UIViewRepresentable {
             scrollView.addGestureRecognizer(pinch)
         }
 
-        @objc private func handlePinch(_ recognizer: UIPinchGestureRecognizer) {
+        @objc
+        private func handlePinch(_ recognizer: UIPinchGestureRecognizer) {
             guard let scrollView else { return }
             let viewportHeight = scrollView.bounds.height
             let contentHeight = scrollView.contentSize.height

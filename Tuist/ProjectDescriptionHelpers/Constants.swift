@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -21,6 +21,8 @@ import ProjectDescription
 
 public enum Constants {
     public static let bundleIdentifierPrefix = "app.kphotos"
+    // This independent app uses its own identity, consistently in Xcode and command-line builds.
+    public static let appBundleIdentifier = bundleIdentifierPrefix
     public static let marketingVersion = "0.1.0"
     public static let currentProjectVersion = "1"
     public static let deploymentTarget: DeploymentTargets = .iOS("16.6")
@@ -28,10 +30,10 @@ public enum Constants {
 
     // Apple Developer Team ID — read from the environment so the repo stays
     // free of any contributor's personal signing identity.
-    // Set `KPHOTOS_DEVELOPMENT_TEAM` in your shell (or .mise.local.toml /
+    // Set `TUIST_KPHOTOS_DEVELOPMENT_TEAM` in your shell (or .mise.local.toml /
     // .envrc) before running `tuist generate`. Leave empty to let Xcode
-    // run the app on the simulator without signing.
-    public static let teamId = ProcessInfo.processInfo.environment["KPHOTOS_DEVELOPMENT_TEAM"] ?? ""
+    // use automatic ad-hoc signing for the simulator (required by Keychain).
+    public static let teamId = Environment.kphotosDevelopmentTeam.getString(default: "")
 
     public static let baseSettings: SettingsDictionary = [
         "SWIFT_VERSION": "5.10",

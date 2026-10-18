@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import XCTest
 @testable import kPhotosCore
+import XCTest
 
 /// Tests des modèles Realm (instanciés non-managés) et de leurs snapshots
 /// thread-safe. On vérifie surtout les propriétés calculées enum↔raw et le
@@ -208,8 +208,10 @@ final class SyncSettingsModelTests: XCTestCase {
     func testSnapshot_fromEntity_blankRootFolder_fallsBackToDefault() {
         let entity = SyncSettings()
         entity.rootFolderName = "   "
-        XCTAssertEqual(SyncSettingsSnapshot(entity).rootFolderName,
-                       SyncSettingsSnapshot.defaultRootFolderName)
+        XCTAssertEqual(
+            SyncSettingsSnapshot(entity).rootFolderName,
+            SyncSettingsSnapshot.defaultRootFolderName
+        )
     }
 
     func testSnapshot_fromEntity_copiesToggleAndPolicy() {

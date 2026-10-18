@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import XCTest
 @testable import kPhotosCore
+import XCTest
 
 /// Décodage des DTO de l'API kDrive. Tolérance aux variations de typage
 /// (`id` Int|String) et aux champs manquants — l'API n'est pas toujours stricte.
@@ -87,13 +87,23 @@ final class RemoteFileDTOTests: XCTestCase {
         XCTAssertEqual(makeDTO(createdAt: 0, addedAt: 0, lastModifiedAt: 300).bestTakenAt, 300)
     }
 
-    private func makeDTO(type: String = "file",
-                         createdAt: Int = 0,
-                         addedAt: Int = 0,
-                         lastModifiedAt: Int = 0) -> RemoteFileDTO {
-        RemoteFileDTO(id: "1", name: "a.jpg", type: type, createdAt: createdAt,
-                      addedAt: addedAt, lastModifiedAt: lastModifiedAt,
-                      mimeType: "image/jpeg", size: 0, hasThumbnail: false)
+    private func makeDTO(
+        type: String = "file",
+        createdAt: Int = 0,
+        addedAt: Int = 0,
+        lastModifiedAt: Int = 0
+    ) -> RemoteFileDTO {
+        RemoteFileDTO(
+            id: "1",
+            name: "a.jpg",
+            type: type,
+            createdAt: createdAt,
+            addedAt: addedAt,
+            lastModifiedAt: lastModifiedAt,
+            mimeType: "image/jpeg",
+            size: 0,
+            hasThumbnail: false
+        )
     }
 }
 
@@ -109,8 +119,10 @@ final class RemoteFileListDTOTests: XCTestCase {
     }
 
     func testDecode_lastPage_hasNilCursor() throws {
-        let dto = try JSONDecoder().decode(RemoteFileListDTO.self,
-                                           from: Data(#"{"data":[]}"#.utf8))
+        let dto = try JSONDecoder().decode(
+            RemoteFileListDTO.self,
+            from: Data(#"{"data":[]}"#.utf8)
+        )
         XCTAssertTrue(dto.data.isEmpty)
         XCTAssertNil(dto.cursor)
         XCTAssertNil(dto.hasMore)
@@ -129,16 +141,20 @@ final class RemoteCategoryDTOTests: XCTestCase {
 
     func testDecode_minimalCategory_appliesDefaults() throws {
         // Réponse d'un PUT : pas de color ni created_at.
-        let dto = try JSONDecoder().decode(RemoteCategoryDTO.self,
-                                           from: Data(#"{"id":5,"name":"Famille"}"#.utf8))
+        let dto = try JSONDecoder().decode(
+            RemoteCategoryDTO.self,
+            from: Data(#"{"id":5,"name":"Famille"}"#.utf8)
+        )
         XCTAssertNil(dto.color)
         XCTAssertEqual(dto.createdAt, 0)
     }
 
     func testDecode_insideInfomaniakEnvelope() throws {
         let json = #"{"result":"success","data":{"id":9,"name":"Album"}}"#
-        let response = try JSONDecoder().decode(InfomaniakResponse<RemoteCategoryDTO>.self,
-                                                from: Data(json.utf8))
+        let response = try JSONDecoder().decode(
+            InfomaniakResponse<RemoteCategoryDTO>.self,
+            from: Data(json.utf8)
+        )
         XCTAssertEqual(response.data.id, 9)
         XCTAssertEqual(response.data.name, "Album")
     }
@@ -146,8 +162,10 @@ final class RemoteCategoryDTOTests: XCTestCase {
 
 final class RemoteDirectoryDTOTests: XCTestCase {
     func testDecode_flexibleId() throws {
-        let dto = try JSONDecoder().decode(RemoteDirectoryDTO.self,
-                                           from: Data(#"{"id":777,"name":"kPhotos"}"#.utf8))
+        let dto = try JSONDecoder().decode(
+            RemoteDirectoryDTO.self,
+            from: Data(#"{"id":777,"name":"kPhotos"}"#.utf8)
+        )
         XCTAssertEqual(dto.id, "777")
         XCTAssertEqual(dto.name, "kPhotos")
     }

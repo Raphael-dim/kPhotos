@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@ public struct PhotoLibrarySummary: Equatable {
 /// Snapshot thread-safe d'un PHAsset — n'expose pas le type Photos vers Core/UI.
 /// Construit en lecture seule depuis PhotoKit, sans aller chercher les binaires.
 public struct LocalAssetSnapshot: Identifiable, Equatable, Sendable {
-    public let id: String              // == localIdentifier
+    public let id: String // == localIdentifier
     public let localIdentifier: String
     public let takenAt: Date
     public let isVideo: Bool
@@ -152,9 +152,11 @@ public final class PHAssetReaderImpl: PHAssetReading {
         case .videosOnly:
             options.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.video.rawValue)
         default:
-            options.predicate = NSPredicate(format: "mediaType == %d OR mediaType == %d",
-                                            PHAssetMediaType.image.rawValue,
-                                            PHAssetMediaType.video.rawValue)
+            options.predicate = NSPredicate(
+                format: "mediaType == %d OR mediaType == %d",
+                PHAssetMediaType.image.rawValue,
+                PHAssetMediaType.video.rawValue
+            )
         }
 
         let fetchResult = PHAsset.fetchAssets(with: options)
@@ -334,9 +336,11 @@ public final class PhotoLibraryObserverImpl: NSObject, PhotoLibraryObserving, PH
         case .videosOnly:
             return NSPredicate(format: "mediaType == %d", PHAssetMediaType.video.rawValue)
         default:
-            return NSPredicate(format: "mediaType == %d OR mediaType == %d",
-                               PHAssetMediaType.image.rawValue,
-                               PHAssetMediaType.video.rawValue)
+            return NSPredicate(
+                format: "mediaType == %d OR mediaType == %d",
+                PHAssetMediaType.image.rawValue,
+                PHAssetMediaType.video.rawValue
+            )
         }
     }
 }

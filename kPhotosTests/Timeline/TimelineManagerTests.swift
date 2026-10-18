@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import XCTest
 @testable import kPhotosCore
+import XCTest
 
 /// Vérifie la règle métier centrale §6 d'AGENTS.md :
 /// la timeline est groupée par mois et ordonnée par `takenAt` desc — JAMAIS par `uploadedAt`.
@@ -55,12 +55,16 @@ final class TimelineManagerTests: XCTestCase {
     func testGroupByYearMonth_ignoresUploadedAt() {
         // Régression : une photo récente uploadée tardivement doit rester groupée par takenAt.
         let calendar = Calendar.iso8601
-        let recentPhotoUploadedNow = makePhoto(id: "x",
-                                               takenAt: date(2020, 7, 10),
-                                               uploadedAt: date(2026, 1, 1))
+        let recentPhotoUploadedNow = makePhoto(
+            id: "x",
+            takenAt: date(2020, 7, 10),
+            uploadedAt: date(2026, 1, 1)
+        )
 
-        let sections = TimelineManagerImpl.groupByYearMonth(photos: [recentPhotoUploadedNow],
-                                                            calendar: calendar)
+        let sections = TimelineManagerImpl.groupByYearMonth(
+            photos: [recentPhotoUploadedNow],
+            calendar: calendar
+        )
 
         XCTAssertEqual(sections.first?.id, "2020-07")
     }

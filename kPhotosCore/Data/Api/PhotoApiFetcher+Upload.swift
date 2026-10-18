@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -46,7 +46,7 @@ public extension PhotoApiFetcher {
 
         return try await performWithRetry { [weak self] in
             guard let self else { throw PhotoAPIError.network(underlying: "fetcher deallocated") }
-            return try await self.performUpload(
+            return try await performUpload(
                 driveId: driveId,
                 folderId: folderId,
                 fileURL: fileURL,
@@ -77,14 +77,19 @@ public extension PhotoApiFetcher {
             createdAt: createdAtUnix,
             clientToken: clientToken
         )
-        APILog.request(method: "POST", url: endpoint.url,
-                       body: "[binary \(totalSize) bytes] Content-Type: \(mimeType)")
-        let decoder = self.decoder
+        APILog.request(
+            method: "POST",
+            url: endpoint.url,
+            body: "[binary \(totalSize) bytes] Content-Type: \(mimeType)"
+        )
+        let decoder = decoder
         let response = await session
-            .upload(fileURL,
-                    to: endpoint.url,
-                    method: .post,
-                    headers: HTTPHeaders([HTTPHeader(name: "Content-Type", value: mimeType)]))
+            .upload(
+                fileURL,
+                to: endpoint.url,
+                method: .post,
+                headers: HTTPHeaders([HTTPHeader(name: "Content-Type", value: mimeType)])
+            )
             .validate()
             .serializingDecodable(InfomaniakResponse<RemoteFileDTO>.self, decoder: decoder)
             .response
@@ -95,10 +100,12 @@ public extension PhotoApiFetcher {
         }
 
         if let error = response.error {
-            throw Self.mapAFError(error,
-                                  statusCode: response.response?.statusCode,
-                                  url: endpoint.url,
-                                  body: response.data)
+            throw Self.mapAFError(
+                error,
+                statusCode: response.response?.statusCode,
+                url: endpoint.url,
+                body: response.data
+            )
         }
 
         throw PhotoAPIError.invalidResponse

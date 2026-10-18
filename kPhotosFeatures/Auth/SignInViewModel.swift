@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -36,8 +36,10 @@ public final class SignInViewModel: ObservableObject {
     /// - tout caractère hors du jeu `[A-Za-z0-9._~+/=-]`
     static let minTokenLength = 20
     static let maxTokenLength = 256
-    static let allowedTokenCharacters = CharacterSet(charactersIn:
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~+/=-")
+    static let allowedTokenCharacters = CharacterSet(
+        charactersIn:
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._~+/=-"
+    )
 
     @Published public private(set) var state: State = .idle
     @Published public var tokenInput: String = ""

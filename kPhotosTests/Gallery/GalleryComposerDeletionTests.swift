@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import XCTest
 @testable import kPhotosCore
+import XCTest
 
 /// Couvre le volet "suppression" du composer : projection
 /// `DeletionItemState → GalleryItemSyncState` et priorité absolue de la
@@ -124,9 +124,11 @@ final class GalleryComposerDeletionTests: XCTestCase {
         )
     }
 
-    private func deletionItem(fileId: String,
-                              state: DeletionItemState,
-                              reason: String = "") -> DeletionItemSnapshot {
+    private func deletionItem(
+        fileId: String,
+        state: DeletionItemState,
+        reason: String = ""
+    ) -> DeletionItemSnapshot {
         DeletionItemSnapshot(
             fileId: fileId, driveId: 1, localIdentifier: "", state: state,
             enqueuedAt: date(), attemptCount: 0, lastAttemptAt: nil,

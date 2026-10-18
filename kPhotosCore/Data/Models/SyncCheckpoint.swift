@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -20,7 +20,8 @@ import Foundation
 import RealmSwift
 
 public final class SyncCheckpoint: Object {
-    @Persisted(primaryKey: true) public var driveId: Int = 0
+    @Persisted(primaryKey: true)
+    public var driveId: Int = 0
     @Persisted public var lastSyncedAt: Date = .init()
     @Persisted public var lastCursor: String = ""
 }

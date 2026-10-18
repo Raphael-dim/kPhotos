@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -147,10 +147,12 @@ public final class AlbumManagerImpl: AlbumManaging {
         var orderedFileIds: [String] = []
         var serverFileIds: Set<String> = []
         repeat {
-            let page = try await api.listCategoryFiles(driveId: driveId,
-                                                       categoryId: categoryId,
-                                                       cursor: cursor,
-                                                       limit: 100)
+            let page = try await api.listCategoryFiles(
+                driveId: driveId,
+                categoryId: categoryId,
+                cursor: cursor,
+                limit: 100
+            )
             for item in page.items {
                 orderedFileIds.append(item.id)
                 serverFileIds.insert(item.id)
@@ -158,7 +160,8 @@ public final class AlbumManagerImpl: AlbumManaging {
             cursor = page.nextCursor
         } while cursor != nil
 
-        try await realm.write { realm in
+        try await realm.write {
+            realm in
             // Ajoute la référence pour chaque photo locale présente côté serveur.
             for fileId in serverFileIds {
                 guard let photo = realm.object(ofType: Photo.self, forPrimaryKey: fileId) else { continue }
@@ -307,10 +310,12 @@ public final class AlbumManagerImpl: AlbumManaging {
             return cached
         }
         guard let categoryId = Int(albumId) else { return nil }
-        let page = try await api.listCategoryFiles(driveId: driveId,
-                                                   categoryId: categoryId,
-                                                   cursor: nil,
-                                                   limit: 1)
+        let page = try await api.listCategoryFiles(
+            driveId: driveId,
+            categoryId: categoryId,
+            cursor: nil,
+            limit: 1
+        )
         guard let first = page.items.first else { return nil }
 
         try await realm.write { realm in

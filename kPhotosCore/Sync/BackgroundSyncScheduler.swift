@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -68,12 +68,14 @@ public final class BackgroundSyncScheduler: BackgroundSyncScheduling {
 
     private var cancellable: AnyCancellable?
 
-    public init(settings: SyncSettingsReading,
-                drives: DriveManaging,
-                sync: PhotoSyncing,
-                reachability: NetworkReachable,
-                refreshInterval: TimeInterval = 60 * 60,
-                processingInterval: TimeInterval = 2 * 60 * 60) {
+    public init(
+        settings: SyncSettingsReading,
+        drives: DriveManaging,
+        sync: PhotoSyncing,
+        reachability: NetworkReachable,
+        refreshInterval: TimeInterval = 60 * 60,
+        processingInterval: TimeInterval = 2 * 60 * 60
+    ) {
         self.settings = settings
         self.drives = drives
         self.sync = sync
@@ -90,14 +92,14 @@ public final class BackgroundSyncScheduler: BackgroundSyncScheduling {
             using: nil
         ) { [weak self] task in
             guard let self, let task = task as? BGAppRefreshTask else { return }
-            self.handle(task: task, budget: self.appRefreshBudget)
+            handle(task: task, budget: appRefreshBudget)
         }
         BGTaskScheduler.shared.register(
             forTaskWithIdentifier: BackgroundSyncIdentifiers.processing,
             using: nil
         ) { [weak self] task in
             guard let self, let task = task as? BGProcessingTask else { return }
-            self.handle(task: task, budget: self.processingBudget)
+            handle(task: task, budget: processingBudget)
         }
 
         // Réagit aux changements de réglages : si l'utilisateur active l'auto-sync
@@ -106,12 +108,16 @@ public final class BackgroundSyncScheduler: BackgroundSyncScheduling {
         cancellable = settings.publisher.sink { [weak self] snapshot in
             guard let self else { return }
             if snapshot.isAutoSyncEnabled {
-                self.scheduleNextRefreshIfNeeded()
+                scheduleNextRefreshIfNeeded()
             } else {
-                BGTaskScheduler.shared.cancel(taskRequestWithIdentifier:
-                    BackgroundSyncIdentifiers.appRefresh)
-                BGTaskScheduler.shared.cancel(taskRequestWithIdentifier:
-                    BackgroundSyncIdentifiers.processing)
+                BGTaskScheduler.shared.cancel(
+                    taskRequestWithIdentifier:
+                    BackgroundSyncIdentifiers.appRefresh
+                )
+                BGTaskScheduler.shared.cancel(
+                    taskRequestWithIdentifier:
+                    BackgroundSyncIdentifiers.processing
+                )
             }
         }
     }

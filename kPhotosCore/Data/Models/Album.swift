@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -20,7 +20,8 @@ import Foundation
 import RealmSwift
 
 public final class Album: Object {
-    @Persisted(primaryKey: true) public var id: String = ""
+    @Persisted(primaryKey: true)
+    public var id: String = ""
     @Persisted public var driveId: Int = 0
     @Persisted public var name: String = ""
     @Persisted public var coverPhotoId: String = ""
@@ -40,13 +41,15 @@ public struct AlbumSnapshot: Identifiable, Equatable, Sendable {
     public let createdAt: Date
     public let isShared: Bool
 
-    public init(id: String,
-                driveId: Int,
-                name: String,
-                coverPhotoId: String,
-                photoCount: Int,
-                createdAt: Date,
-                isShared: Bool) {
+    public init(
+        id: String,
+        driveId: Int,
+        name: String,
+        coverPhotoId: String,
+        photoCount: Int,
+        createdAt: Date,
+        isShared: Bool
+    ) {
         self.id = id
         self.driveId = driveId
         self.name = name

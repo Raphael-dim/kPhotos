@@ -1,16 +1,8 @@
-project: kPhotos.xcodeproj
+project: kPhotos.xcworkspace
 schemes:
   - kPhotos
-targets:
-  - kPhotos
-  - kPhotosCore
-  - kPhotosCoreUI
-  - kPhotosFeatures
-  - kPhotosShareExtension
-  - kPhotosWidget
-
 retain_public: true
-retain_assign_only_property: true
+retain_assign_only_properties: true
 retain_objc_accessible: true
 
 # Realm @Persisted properties sont accédées via Realm dynamic dispatch

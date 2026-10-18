@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -28,8 +28,8 @@ public struct InfomaniakResponse<T: Decodable>: Decodable {
 public struct RemoteFileDTO: Decodable, Equatable {
     public let id: String
     public let name: String
-    public let type: String         // "file" | "dir"
-    public let visibility: String   // ex: "is_private_space", "is_in_private_space", "is_shared_space"
+    public let type: String // "file" | "dir"
+    public let visibility: String // ex: "is_private_space", "is_in_private_space", "is_shared_space"
     /// Date de prise de vue extraite des métadonnées EXIF (ou spécifiée à l'upload via
     /// `created_at` query param). **Souvent 0** pour les fichiers uploadés depuis le web
     /// sans EXIF (screenshots, etc.) — d'où la nécessité du fallback sur `addedAt`.
@@ -72,36 +72,38 @@ public struct RemoteFileDTO: Decodable, Equatable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try Self.decodeFlexibleId(from: c, forKey: .id)
-        name = try c.decode(String.self, forKey: .name)
-        type = (try? c.decode(String.self, forKey: .type)) ?? "file"
-        visibility = (try? c.decode(String.self, forKey: .visibility)) ?? ""
-        createdAt = (try? c.decode(Int.self, forKey: .createdAt)) ?? 0
-        addedAt = (try? c.decode(Int.self, forKey: .addedAt)) ?? 0
-        lastModifiedAt = (try? c.decode(Int.self, forKey: .lastModifiedAt)) ?? 0
-        mimeType = (try? c.decode(String.self, forKey: .mimeType)) ?? ""
-        size = (try? c.decode(Int64.self, forKey: .size)) ?? 0
-        hasThumbnail = (try? c.decode(Bool.self, forKey: .hasThumbnail)) ?? false
+        self.id = try Self.decodeFlexibleId(from: c, forKey: .id)
+        self.name = try c.decode(String.self, forKey: .name)
+        self.type = (try? c.decode(String.self, forKey: .type)) ?? "file"
+        self.visibility = (try? c.decode(String.self, forKey: .visibility)) ?? ""
+        self.createdAt = (try? c.decode(Int.self, forKey: .createdAt)) ?? 0
+        self.addedAt = (try? c.decode(Int.self, forKey: .addedAt)) ?? 0
+        self.lastModifiedAt = (try? c.decode(Int.self, forKey: .lastModifiedAt)) ?? 0
+        self.mimeType = (try? c.decode(String.self, forKey: .mimeType)) ?? ""
+        self.size = (try? c.decode(Int64.self, forKey: .size)) ?? 0
+        self.hasThumbnail = (try? c.decode(Bool.self, forKey: .hasThumbnail)) ?? false
         if let parentInt = try? c.decode(Int.self, forKey: .parentId) {
-            parentId = String(parentInt)
+            self.parentId = String(parentInt)
         } else {
-            parentId = try? c.decode(String.self, forKey: .parentId)
+            self.parentId = try? c.decode(String.self, forKey: .parentId)
         }
     }
 
     /// Memberwise init explicite (le `init(from decoder:)` ci-dessus supprime celui auto-généré).
     /// Utile pour les tests et la construction directe.
-    public init(id: String,
-                name: String,
-                type: String = "file",
-                visibility: String = "",
-                createdAt: Int,
-                addedAt: Int = 0,
-                lastModifiedAt: Int,
-                mimeType: String,
-                size: Int64,
-                hasThumbnail: Bool,
-                parentId: String? = nil) {
+    public init(
+        id: String,
+        name: String,
+        type: String = "file",
+        visibility: String = "",
+        createdAt: Int,
+        addedAt: Int = 0,
+        lastModifiedAt: Int,
+        mimeType: String,
+        size: Int64,
+        hasThumbnail: Bool,
+        parentId: String? = nil
+    ) {
         self.id = id
         self.name = name
         self.type = type
@@ -157,7 +159,11 @@ public struct RemoteFileDetailDTO: Decodable {
     public let extensionType: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, path, size, hash
+        case id
+        case name
+        case path
+        case size
+        case hash
         case mimeType = "mime_type"
         case createdAt = "created_at"
         case addedAt = "added_at"
@@ -167,16 +173,16 @@ public struct RemoteFileDetailDTO: Decodable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try RemoteFileDTO.decodeFlexibleId(from: c, forKey: .id)
-        name = (try? c.decode(String.self, forKey: .name)) ?? ""
-        path = try? c.decode(String.self, forKey: .path)
-        size = (try? c.decode(Int64.self, forKey: .size)) ?? 0
-        mimeType = (try? c.decode(String.self, forKey: .mimeType)) ?? ""
-        createdAt = (try? c.decode(Int.self, forKey: .createdAt)) ?? 0
-        addedAt = try? c.decode(Int.self, forKey: .addedAt)
-        lastModifiedAt = (try? c.decode(Int.self, forKey: .lastModifiedAt)) ?? 0
-        hash = try? c.decode(String.self, forKey: .hash)
-        extensionType = try? c.decode(String.self, forKey: .extensionType)
+        self.id = try RemoteFileDTO.decodeFlexibleId(from: c, forKey: .id)
+        self.name = (try? c.decode(String.self, forKey: .name)) ?? ""
+        self.path = try? c.decode(String.self, forKey: .path)
+        self.size = (try? c.decode(Int64.self, forKey: .size)) ?? 0
+        self.mimeType = (try? c.decode(String.self, forKey: .mimeType)) ?? ""
+        self.createdAt = (try? c.decode(Int.self, forKey: .createdAt)) ?? 0
+        self.addedAt = try? c.decode(Int.self, forKey: .addedAt)
+        self.lastModifiedAt = (try? c.decode(Int.self, forKey: .lastModifiedAt)) ?? 0
+        self.hash = try? c.decode(String.self, forKey: .hash)
+        self.extensionType = try? c.decode(String.self, forKey: .extensionType)
     }
 }
 
@@ -202,10 +208,10 @@ public struct RemoteCategoryDTO: Decodable, Equatable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try c.decode(Int.self, forKey: .id)
-        name = try c.decode(String.self, forKey: .name)
-        color = try? c.decode(String.self, forKey: .color)
-        createdAt = (try? c.decode(Int.self, forKey: .createdAt)) ?? 0
+        self.id = try c.decode(Int.self, forKey: .id)
+        self.name = try c.decode(String.self, forKey: .name)
+        self.color = try? c.decode(String.self, forKey: .color)
+        self.createdAt = (try? c.decode(Int.self, forKey: .createdAt)) ?? 0
     }
 
     public init(id: Int, name: String, color: String? = nil, createdAt: Int = 0) {
@@ -229,8 +235,8 @@ public struct RemoteDirectoryDTO: Decodable, Equatable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        id = try RemoteFileDTO.decodeFlexibleId(from: c, forKey: .id)
-        name = try c.decode(String.self, forKey: .name)
-        createdAt = (try? c.decode(Int.self, forKey: .createdAt)) ?? 0
+        self.id = try RemoteFileDTO.decodeFlexibleId(from: c, forKey: .id)
+        self.name = try c.decode(String.self, forKey: .name)
+        self.createdAt = (try? c.decode(Int.self, forKey: .createdAt)) ?? 0
     }
 }

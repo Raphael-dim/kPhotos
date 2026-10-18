@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import XCTest
 @testable import kPhotosCore
+import XCTest
 
 /// Vérifie la règle métier centrale §6 d'AGENTS.md :
 /// au moment de transformer un upload réussi en `Photo`, `takenAt` DOIT venir
@@ -95,28 +95,35 @@ final class PhotoSyncEngineMappingTests: XCTestCase {
             addedAt: Int(addedDate.timeIntervalSince1970),
             lastModifiedAt: Int(addedDate.timeIntervalSince1970),
             mimeType: "image/png",
-            size: 92_200,
+            size: 92200,
             hasThumbnail: true
         )
 
         let snapshot = PhotoSyncEngine.makeSnapshot(from: dto, driveId: 7)
 
-        XCTAssertEqual(snapshot.takenAt, addedDate,
-                       "Sans EXIF côté serveur, on retombe sur added_at — jamais 1970.")
+        XCTAssertEqual(
+            snapshot.takenAt,
+            addedDate,
+            "Sans EXIF côté serveur, on retombe sur added_at — jamais 1970."
+        )
         XCTAssertEqual(snapshot.uploadedAt, addedDate)
     }
 
     // MARK: - Retry classifier (Phase 2a)
 
     func testClassify_noResource_isPermanent() {
-        let decision = BackupRetryClassifier.classify(error: ExportError.noResource,
-                                                      attemptCount: 1)
+        let decision = BackupRetryClassifier.classify(
+            error: ExportError.noResource,
+            attemptCount: 1
+        )
         XCTAssertEqual(decision, .permanent)
     }
 
     func testClassify_missingCreationDate_isPermanent() {
-        let decision = BackupRetryClassifier.classify(error: ExportError.missingCreationDate,
-                                                      attemptCount: 1)
+        let decision = BackupRetryClassifier.classify(
+            error: ExportError.missingCreationDate,
+            attemptCount: 1
+        )
         XCTAssertEqual(decision, .permanent)
     }
 
@@ -222,7 +229,9 @@ final class PhotoSyncEngineMappingTests: XCTestCase {
 
         XCTAssertEqual(snapshot.takenAt, serverCreated)
         XCTAssertEqual(snapshot.driveId, 7)
-        XCTAssertTrue(snapshot.localIdentifier.isEmpty,
-                      "Pas de PHAsset connu — localIdentifier doit rester vide")
+        XCTAssertTrue(
+            snapshot.localIdentifier.isEmpty,
+            "Pas de PHAsset connu — localIdentifier doit rester vide"
+        )
     }
 }

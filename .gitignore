@@ -32,6 +32,7 @@ Tuist/Dependencies/Lockfiles/
 .build/
 .swiftpm/
 Package.resolved
+!Tuist/Package.resolved
 Packages/
 
 # Mise
@@ -69,3 +70,18 @@ fastlane/test_output
 .vscode/
 .idea/
 *.swp
+
+# Private work, diagnostics and app databases (never publish)
+.local/
+.codex/
+.agents/
+__pycache__/
+*.pyc
+*.xcresult/
+*.realm
+*.realm.*
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+*.har

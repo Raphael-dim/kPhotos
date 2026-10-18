@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -11,6 +11,9 @@
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 import Foundation
@@ -77,7 +80,7 @@ public final class FolderPickerViewModel: ObservableObject {
         defer { if !keepCurrent { isLoading = false } }
         do {
             let page = try await api.listFolder(driveId: driveId, folderId: folderId, cursor: nil, limit: 100)
-            let folders = page.items.filter { $0.isDirectory }
+            let folders = page.items.filter(\.isDirectory)
             if !keepCurrent {
                 currentFolder = FolderNode(
                     folderId: folderId,

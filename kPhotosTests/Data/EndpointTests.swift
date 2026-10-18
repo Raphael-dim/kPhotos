@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -16,15 +16,17 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import XCTest
 @testable import kPhotosCore
+import XCTest
 
 /// Vérifie la construction des URLs kDrive — chemins versionnés (`/2/` vs `/3/`)
 /// et query params. Une URL erronée = 404 silencieux côté API.
 final class EndpointTests: XCTestCase {
     func testURL_composesHostPathAndQuery() {
-        let endpoint = Endpoint(path: "/2/drive/1/foo",
-                                queryItems: [URLQueryItem(name: "a", value: "b")])
+        let endpoint = Endpoint(
+            path: "/2/drive/1/foo",
+            queryItems: [URLQueryItem(name: "a", value: "b")]
+        )
         let url = endpoint.url
         XCTAssertEqual(url.scheme, "https")
         XCTAssertEqual(url.host, "api.kdrive.infomaniak.com")
@@ -43,18 +45,24 @@ final class EndpointTests: XCTestCase {
     }
 
     func testCategory_singleEndpoint() {
-        XCTAssertEqual(Endpoint.category(driveId: 7, categoryId: 3).url.path,
-                       "/2/drive/7/categories/3")
+        XCTAssertEqual(
+            Endpoint.category(driveId: 7, categoryId: 3).url.path,
+            "/2/drive/7/categories/3"
+        )
     }
 
     func testFileCategory_attachEndpoint() {
-        XCTAssertEqual(Endpoint.fileCategory(driveId: 7, fileId: 100, categoryId: 3).url.path,
-                       "/2/drive/7/files/100/categories/3")
+        XCTAssertEqual(
+            Endpoint.fileCategory(driveId: 7, fileId: 100, categoryId: 3).url.path,
+            "/2/drive/7/files/100/categories/3"
+        )
     }
 
     func testFilesCategory_bulkEndpoint() {
-        XCTAssertEqual(Endpoint.filesCategory(driveId: 7, categoryId: 3).url.path,
-                       "/2/drive/7/files/categories/3")
+        XCTAssertEqual(
+            Endpoint.filesCategory(driveId: 7, categoryId: 3).url.path,
+            "/2/drive/7/files/categories/3"
+        )
     }
 
     func testCategoryFiles_usesV3AndLimit_withoutCursor() {
@@ -104,8 +112,10 @@ final class EndpointTests: XCTestCase {
 
     func testPreview_withoutParams_hasNoQuery() {
         XCTAssertNil(Endpoint.preview(driveId: 7, fileId: "42").url.query)
-        XCTAssertEqual(Endpoint.preview(driveId: 7, fileId: "42").url.path,
-                       "/2/drive/7/files/42/preview")
+        XCTAssertEqual(
+            Endpoint.preview(driveId: 7, fileId: "42").url.path,
+            "/2/drive/7/files/42/preview"
+        )
     }
 
     func testPreview_withDimensions_carriesQuery() {
@@ -117,14 +127,22 @@ final class EndpointTests: XCTestCase {
     }
 
     func testThumbnailDownloadDeleteFileInfo_paths() {
-        XCTAssertEqual(Endpoint.thumbnail(driveId: 7, fileId: "42").url.path,
-                       "/2/drive/7/files/42/thumbnail")
-        XCTAssertEqual(Endpoint.download(driveId: 7, fileId: "42").url.path,
-                       "/2/drive/7/files/42/download")
-        XCTAssertEqual(Endpoint.delete(driveId: 7, fileId: "42").url.path,
-                       "/2/drive/7/files/42")
-        XCTAssertEqual(Endpoint.fileInfo(driveId: 7, fileId: "42").url.path,
-                       "/3/drive/7/files/42")
+        XCTAssertEqual(
+            Endpoint.thumbnail(driveId: 7, fileId: "42").url.path,
+            "/2/drive/7/files/42/thumbnail"
+        )
+        XCTAssertEqual(
+            Endpoint.download(driveId: 7, fileId: "42").url.path,
+            "/2/drive/7/files/42/download"
+        )
+        XCTAssertEqual(
+            Endpoint.delete(driveId: 7, fileId: "42").url.path,
+            "/2/drive/7/files/42"
+        )
+        XCTAssertEqual(
+            Endpoint.fileInfo(driveId: 7, fileId: "42").url.path,
+            "/3/drive/7/files/42"
+        )
     }
 
     func testSearch_defaultsToImageType() {

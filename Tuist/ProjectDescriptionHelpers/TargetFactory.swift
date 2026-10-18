@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -58,7 +58,9 @@ public enum TargetFactory {
             resources: resources,
             entitlements: entitlements,
             dependencies: dependencies,
-            settings: .settings(base: Constants.baseSettings)
+            settings: .settings(base: Constants.baseSettings.merging([
+                "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon"
+            ]) { _, value in value })
         )
     }
 

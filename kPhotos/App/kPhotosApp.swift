@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -22,23 +22,29 @@ import kPhotosFeatures
 import SwiftUI
 
 @main
-struct kPhotosApp: App {
+struct KPhotosApp: App {
     @InjectService private var backgroundScheduler: BackgroundSyncScheduling
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppTheme.storageKey) private var theme: AppTheme = .system
+
+    private static var isUnitTestHost: Bool { NSClassFromString("XCTestCase") != nil }
 
     init() {
         FactoryService.registerAll()
         // Doit être appelé avant la fin de `application:didFinishLaunchingWithOptions`,
         // sinon `BGTaskScheduler.register` crash. SwiftUI App `init` est exécuté
         // dans cette fenêtre.
-        backgroundScheduler.bootstrap()
+        if !Self.isUnitTestHost { backgroundScheduler.bootstrap() }
     }
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .preferredColorScheme(theme.colorScheme)
+            if Self.isUnitTestHost {
+                Color.clear
+            } else {
+                RootView()
+                    .preferredColorScheme(theme.colorScheme)
+            }
         }
         // À chaque passage en background, on (re-)soumet les `BGTaskRequest`.
         // Sans ça, après le tout premier slot BG consommé par iOS, on serait

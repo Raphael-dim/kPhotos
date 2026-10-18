@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -23,13 +23,13 @@ public extension PhotoApiFetcher {
     func listDrives() async throws -> [RemoteDriveDTO] {
         try await performWithRetry { [weak self] in
             guard let self else { throw PhotoAPIError.network(underlying: "fetcher deallocated") }
-            return try await self.requestDrives()
+            return try await requestDrives()
         }
     }
 
     private func requestDrives() async throws -> [RemoteDriveDTO] {
         APILog.request(method: "GET", url: Endpoint.listDrives.url, body: nil)
-        let decoder = self.decoder
+        let decoder = decoder
         let response = await session
             .request(Endpoint.listDrives.url, method: .get)
             .validate()
@@ -41,10 +41,12 @@ public extension PhotoApiFetcher {
             return value.data.drives
         }
         if let error = response.error {
-            throw Self.mapAFError(error,
-                                  statusCode: response.response?.statusCode,
-                                  url: Endpoint.listDrives.url,
-                                  body: response.data)
+            throw Self.mapAFError(
+                error,
+                statusCode: response.response?.statusCode,
+                url: Endpoint.listDrives.url,
+                body: response.data
+            )
         }
         throw PhotoAPIError.invalidResponse
     }

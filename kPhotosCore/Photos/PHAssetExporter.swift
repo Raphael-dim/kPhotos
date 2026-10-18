@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -98,9 +98,11 @@ public final class PHAssetExporterImpl: PHAssetExporting {
         case .videosOnly:
             return NSPredicate(format: "mediaType == %d", PHAssetMediaType.video.rawValue)
         case .both:
-            return NSPredicate(format: "mediaType == %d OR mediaType == %d",
-                               PHAssetMediaType.image.rawValue,
-                               PHAssetMediaType.video.rawValue)
+            return NSPredicate(
+                format: "mediaType == %d OR mediaType == %d",
+                PHAssetMediaType.image.rawValue,
+                PHAssetMediaType.video.rawValue
+            )
         default:
             // OptionSet vide : on ne synchronise rien.
             return NSPredicate(value: false)
@@ -148,10 +150,12 @@ public final class PHAssetExporterImpl: PHAssetExporting {
         resources.first { $0.type == .photo || $0.type == .video } ?? resources.first
     }
 
-    static func makeFileName(creationDate: Date,
-                             localIdentifier: String,
-                             uniformTypeIdentifier: String,
-                             originalFilename: String) -> String {
+    static func makeFileName(
+        creationDate: Date,
+        localIdentifier: String,
+        uniformTypeIdentifier: String,
+        originalFilename: String
+    ) -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .iso8601)
         formatter.timeZone = TimeZone(secondsFromGMT: 0)

@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -89,23 +89,23 @@ private extension View {
     /// toolchains plus anciennes.
     @ViewBuilder
     func glassCapsule() -> some View {
-#if compiler(>=6.2)
+        #if compiler(>=6.2)
         if #available(iOS 26.0, *) {
             self.glassEffect(.regular, in: Capsule(style: .continuous))
         } else {
-            self.background(.ultraThinMaterial, in: Capsule(style: .continuous))
+            background(.ultraThinMaterial, in: Capsule(style: .continuous))
                 .overlay(
                     Capsule(style: .continuous)
                         .strokeBorder(Color(uiColor: .separator).opacity(0.4), lineWidth: 0.5)
                 )
         }
-#else
-        self.background(.ultraThinMaterial, in: Capsule(style: .continuous))
+        #else
+        background(.ultraThinMaterial, in: Capsule(style: .continuous))
             .overlay(
                 Capsule(style: .continuous)
                     .strokeBorder(Color(uiColor: .separator).opacity(0.4), lineWidth: 0.5)
             )
-#endif
+        #endif
     }
 }
 

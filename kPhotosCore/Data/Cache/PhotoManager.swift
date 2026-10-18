@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -11,6 +11,9 @@
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 import Foundation
@@ -69,9 +72,11 @@ public protocol BackupQueueWriting: AnyObject {
     /// pour ce `localIdentifier` (quel que soit son état) — la dédup est gérée
     /// par la clé primaire Realm + ce garde-fou.
     /// Génère un `clientToken` UUID stable persisté pour la vie de l'item.
-    func enqueueIfAbsent(localIdentifier: String,
-                         creationDate: Date,
-                         isVideo: Bool) async throws
+    func enqueueIfAbsent(
+        localIdentifier: String,
+        creationDate: Date,
+        isVideo: Bool
+    ) async throws
 
     /// Transitions de state machine. Garantit l'atomicité d'une bascule
     /// state + métadonnées associées (lastAttemptAt, lastErrorReason, attemptCount).
@@ -81,9 +86,11 @@ public protocol BackupQueueWriting: AnyObject {
     /// Le worker reprendra cet item dès que `now() >= nextRetryAt` au prochain
     /// coup de moteur (sync manuelle ou BG). Ne réinitialise PAS `attemptCount` —
     /// permet au classifier d'allonger le backoff sur les retries successifs.
-    func markFailedTransient(localIdentifier: String,
-                             reason: String,
-                             nextRetryAt: Date) async throws
+    func markFailedTransient(
+        localIdentifier: String,
+        reason: String,
+        nextRetryAt: Date
+    ) async throws
     func markFailedPermanent(localIdentifier: String, reason: String) async throws
     func markSkipped(localIdentifier: String, reason: String) async throws
 
@@ -135,9 +142,11 @@ public protocol DeletionQueueWriting: AnyObject {
     /// Enqueue une suppression. No-op si un item existe déjà pour ce `fileId`
     /// (sauf s'il était en `.failedPermanent` — auquel cas on le re-queue,
     /// l'utilisateur a explicitement re-déclenché la suppression).
-    func enqueueDeletion(fileId: String,
-                         driveId: Int,
-                         localIdentifier: String) async throws
+    func enqueueDeletion(
+        fileId: String,
+        driveId: Int,
+        localIdentifier: String
+    ) async throws
 
     func markDeleting(fileId: String) async throws
     /// Marque comme `.completed` ET supprime le `Photo` Realm correspondant.
@@ -145,9 +154,11 @@ public protocol DeletionQueueWriting: AnyObject {
     /// "photo encore présente, suppression complète". Purge aussi l'entry
     /// DeletionItem (l'historique des completed n'a aucune utilité).
     func markDeletionCompleted(fileId: String) async throws
-    func markDeletionFailedTransient(fileId: String,
-                                     reason: String,
-                                     nextRetryAt: Date) async throws
+    func markDeletionFailedTransient(
+        fileId: String,
+        reason: String,
+        nextRetryAt: Date
+    ) async throws
     func markDeletionFailedPermanent(fileId: String, reason: String) async throws
 
     /// Annule une suppression en file qui n'a pas encore touché l'API (state
@@ -166,7 +177,8 @@ public protocol DeletionQueueWriting: AnyObject {
 
 public typealias DeletionQueueing = DeletionQueueReading & DeletionQueueWriting
 
-public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueReading, BackupQueueWriting, DeletionQueueReading, DeletionQueueWriting {
+public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueReading, BackupQueueWriting, DeletionQueueReading,
+    DeletionQueueWriting {
     private let realm: RealmAccessor
 
     public init(realm: RealmAccessor) {
@@ -283,10 +295,12 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
             // mais notre invariant : `.failedTransient` ⇒ `nextRetryAt != nil` (cf.
             // `markFailedTransient`). Donc on peut comparer sans guard.
             let processable = realm.objects(BackupItem.self)
-                .filter("stateRaw == %@ OR (stateRaw == %@ AND nextRetryAt <= %@)",
-                        BackupItemState.queued.rawValue,
-                        BackupItemState.failedTransient.rawValue,
-                        now as NSDate)
+                .filter(
+                    "stateRaw == %@ OR (stateRaw == %@ AND nextRetryAt <= %@)",
+                    BackupItemState.queued.rawValue,
+                    BackupItemState.failedTransient.rawValue,
+                    now as NSDate
+                )
                 .sorted(byKeyPath: "creationDate", ascending: false)
             if let limit {
                 return processable.prefix(limit).map(BackupItemSnapshot.init)
@@ -304,17 +318,21 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
 
     public func completedLocalIdentifiers() throws -> Set<String> {
         try realm.read { realm in
-            Set(realm.objects(BackupItem.self)
-                .filter("stateRaw == %@", BackupItemState.completed.rawValue)
-                .map(\.localIdentifier))
+            Set(
+                realm.objects(BackupItem.self)
+                    .filter("stateRaw == %@", BackupItemState.completed.rawValue)
+                    .map(\.localIdentifier)
+            )
         }
     }
 
     // MARK: - BackupQueueWriting
 
-    public func enqueueIfAbsent(localIdentifier: String,
-                                creationDate: Date,
-                                isVideo: Bool) async throws {
+    public func enqueueIfAbsent(
+        localIdentifier: String,
+        creationDate: Date,
+        isVideo: Bool
+    ) async throws {
         guard !localIdentifier.isEmpty else { return }
         try await realm.write { realm in
             if realm.object(ofType: BackupItem.self, forPrimaryKey: localIdentifier) != nil {
@@ -352,9 +370,11 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
         }
     }
 
-    public func markFailedTransient(localIdentifier: String,
-                                    reason: String,
-                                    nextRetryAt: Date) async throws {
+    public func markFailedTransient(
+        localIdentifier: String,
+        reason: String,
+        nextRetryAt: Date
+    ) async throws {
         try await mutate(localIdentifier: localIdentifier) { entity in
             entity.state = .failedTransient
             entity.lastErrorReason = reason
@@ -438,10 +458,12 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
             //   state == queued OR (state == failedTransient AND nextRetryAt <= now)
             // Invariant `failedTransient ⇒ nextRetryAt != nil` (cf. `markDeletionFailedTransient`).
             let processable = realm.objects(DeletionItem.self)
-                .filter("stateRaw == %@ OR (stateRaw == %@ AND nextRetryAt <= %@)",
-                        DeletionItemState.queued.rawValue,
-                        DeletionItemState.failedTransient.rawValue,
-                        now as NSDate)
+                .filter(
+                    "stateRaw == %@ OR (stateRaw == %@ AND nextRetryAt <= %@)",
+                    DeletionItemState.queued.rawValue,
+                    DeletionItemState.failedTransient.rawValue,
+                    now as NSDate
+                )
                 .sorted(byKeyPath: "enqueuedAt", ascending: true)
             if let limit {
                 return processable.prefix(limit).map(DeletionItemSnapshot.init)
@@ -465,9 +487,11 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
 
     // MARK: - DeletionQueueWriting
 
-    public func enqueueDeletion(fileId: String,
-                                driveId: Int,
-                                localIdentifier: String) async throws {
+    public func enqueueDeletion(
+        fileId: String,
+        driveId: Int,
+        localIdentifier: String
+    ) async throws {
         guard !fileId.isEmpty else { return }
         try await realm.write { realm in
             if let existing = realm.object(ofType: DeletionItem.self, forPrimaryKey: fileId) {
@@ -515,9 +539,11 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
         }
     }
 
-    public func markDeletionFailedTransient(fileId: String,
-                                            reason: String,
-                                            nextRetryAt: Date) async throws {
+    public func markDeletionFailedTransient(
+        fileId: String,
+        reason: String,
+        nextRetryAt: Date
+    ) async throws {
         try await mutateDeletion(fileId: fileId) { entity in
             entity.state = .failedTransient
             entity.lastErrorReason = reason
@@ -569,24 +595,32 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
     }
 
     /// Helper mutateur DeletionItem — pendant du `mutate` côté BackupItem.
-    private func mutateDeletion(fileId: String,
-                                _ block: @escaping (DeletionItem) -> Void) async throws {
+    private func mutateDeletion(
+        fileId: String,
+        _ block: @escaping (DeletionItem) -> Void
+    ) async throws {
         guard !fileId.isEmpty else { return }
         try await realm.write { realm in
-            guard let entity = realm.object(ofType: DeletionItem.self,
-                                            forPrimaryKey: fileId) else { return }
+            guard let entity = realm.object(
+                ofType: DeletionItem.self,
+                forPrimaryKey: fileId
+            ) else { return }
             block(entity)
         }
     }
 
     /// Helper mutateur : applique un block sur l'entité gérée si elle existe.
     /// No-op silencieux si l'item a disparu (asset supprimé localement entre-temps).
-    private func mutate(localIdentifier: String,
-                        _ block: @escaping (BackupItem) -> Void) async throws {
+    private func mutate(
+        localIdentifier: String,
+        _ block: @escaping (BackupItem) -> Void
+    ) async throws {
         guard !localIdentifier.isEmpty else { return }
         try await realm.write { realm in
-            guard let entity = realm.object(ofType: BackupItem.self,
-                                            forPrimaryKey: localIdentifier) else { return }
+            guard let entity = realm.object(
+                ofType: BackupItem.self,
+                forPrimaryKey: localIdentifier
+            ) else { return }
             block(entity)
         }
     }
@@ -610,8 +644,7 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
         // Préfixe daté `yyyyMMdd_HHmmss` strictement numérique — sinon ce n'est pas
         // un fichier exporté par notre app, on n'essaie pas de deviner.
         guard parts[0].count == 8, parts[0].allSatisfy({ $0.isASCII && $0.isNumber }),
-              parts[1].count == 6, parts[1].allSatisfy({ $0.isASCII && $0.isNumber })
-        else { return nil }
+              parts[1].count == 6, parts[1].allSatisfy({ $0.isASCII && $0.isNumber }) else { return nil }
         // `joined(separator: "_")` au cas où le `localIdentifier` contiendrait
         // un `_` (rare mais autorisé par PhotoKit).
         let sanitized = parts.dropFirst(2).joined(separator: "_")

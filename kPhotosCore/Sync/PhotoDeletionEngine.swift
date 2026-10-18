@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -11,6 +11,9 @@
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 import Foundation
@@ -71,9 +74,11 @@ public final class PhotoDeletionEngine: PhotoDeleting {
     /// où on lit `nextDeletable` et celui où on `markDeleting`.
     private var isDraining = false
 
-    public init(api: PhotoApiFetching,
-                deletionQueueReader: DeletionQueueReading,
-                deletionQueueWriter: DeletionQueueWriting) {
+    public init(
+        api: PhotoApiFetching,
+        deletionQueueReader: DeletionQueueReading,
+        deletionQueueWriter: DeletionQueueWriting
+    ) {
         self.api = api
         self.deletionQueueReader = deletionQueueReader
         self.deletionQueueWriter = deletionQueueWriter
@@ -186,7 +191,7 @@ public enum DeletionRetryClassifier {
 
         if let apiError = error as? PhotoAPIError {
             switch apiError {
-            case .network, .rateLimited, .server(statusCode: 500..<600, _):
+            case .network, .rateLimited, .server(statusCode: 500 ..< 600, _):
                 return .transient(retryAfter: backoff(forAttempt: attemptCount, base: 15))
             case .notFound:
                 // 404 sur DELETE = la photo n'existe déjà plus côté serveur

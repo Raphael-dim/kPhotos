@@ -1,4 +1,20 @@
 #!/usr/bin/env bash
+# kPhotos - iOS client for kDrive
+# Copyright (C) 2026 Raphaël Dimeck
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 # kPhotos / Infomaniak — Advanced viability tests.
 # Verifies CRITICAL operations for a full Photos app:
 #   - Real image upload (JPEG)
@@ -92,7 +108,7 @@ HTTP=$(curl -sS -o "$UPLOAD_RES" -w "%{http_code}" \
     -H "Content-Type: image/jpeg" \
     --data-binary "@$JPEG_FILE")
 echo -e "${BLUE}← HTTP $HTTP${NC}"
-jq -C '.' < "$UPLOAD_RES" 2>/dev/null || cat "$UPLOAD_RES"
+jq -C '{result: .result, error_code: .error.code}' < "$UPLOAD_RES" 2>/dev/null || true
 JPEG_ID=$(jq -r '.data.id // empty' < "$UPLOAD_RES")
 if [[ -n "$JPEG_ID" ]]; then
     CREATED_IDS+=("$JPEG_ID")
@@ -141,7 +157,7 @@ if [[ -n "${JPEG_ID:-}" ]]; then
         echo -e "  ${GREEN}✓${NC} Thumbnail generated"
         mark OK "T3 Thumbnail"
     else
-        echo "  body: $(head -c 200 "$THUMB_RES")"
+        echo "  (response body omitted)"
         mark FAIL "T3 Thumbnail"
     fi
     rm -f "$THUMB_RES"
@@ -163,7 +179,7 @@ if [[ -n "${JPEG_ID:-}" ]]; then
         echo -e "  ${GREEN}✓${NC} Preview generated"
         mark OK "T4 Preview"
     else
-        echo "  body: $(head -c 200 "$PREV_RES")"
+        echo "  (response body omitted)"
         mark FAIL "T4 Preview"
     fi
     rm -f "$PREV_RES"
@@ -190,7 +206,7 @@ if [[ -n "${JPEG_ID:-}" ]]; then
             mark FAIL "T5 Download integrity"
         fi
     else
-        echo "  body: $(head -c 200 "$DL_RES")"
+        echo "  (response body omitted)"
         mark FAIL "T5 Download"
     fi
     rm -f "$DL_RES"
@@ -247,7 +263,7 @@ if [[ -n "$BIN_ID" ]]; then
     assert_eq "200KB created_at" "$TEST_DATE" "$BIN_CREATED" && mark OK "T7b Date preserved (200KB)" || mark FAIL "T7b Date preserved (200KB)"
     rm -f "$BIN_META"
 else
-    jq -C '.' < "$RES"
+    jq -C '{result: .result, error_code: .error.code}' < "$RES"
     mark FAIL "T7 Upload 200KB"
 fi
 rm -f "$RES"
@@ -278,8 +294,8 @@ echo "    HTTP $HTTP"
 TOKEN=$(jq -r '.data.token // empty' < "$START_RES")
 UPLOAD_HOST=$(jq -r '.data.upload_url // empty' < "$START_RES")
 CHUNK_FILE_ID=$(jq -r '.data.file.id // empty' < "$START_RES")
-echo "    session_token=$TOKEN"
-echo "    upload_host=$UPLOAD_HOST"
+echo "    session token received (redacted)"
+echo "    upload host received (redacted)"
 echo "    file_id=$CHUNK_FILE_ID"
 rm -f "$START_RES"
 
@@ -298,7 +314,7 @@ else
         -H "Authorization: Bearer $PAT" \
         -H "Content-Type: application/octet-stream" \
         --data-binary "@$CHUNK1")
-    echo "    HTTP $HTTP — body: $(head -c 200 "$CHUNK1_RES")"
+    echo "    HTTP $HTTP (response body omitted)"
     [[ "$HTTP" =~ ^2 ]] && mark OK "T8b Chunk 1 upload" || mark FAIL "T8b Chunk 1"
     rm -f "$CHUNK1_RES"
 
@@ -310,7 +326,7 @@ else
         -H "Authorization: Bearer $PAT" \
         -H "Content-Type: application/octet-stream" \
         --data-binary "@$CHUNK2")
-    echo "    HTTP $HTTP — body: $(head -c 200 "$CHUNK2_RES")"
+    echo "    HTTP $HTTP (response body omitted)"
     [[ "$HTTP" =~ ^2 ]] && mark OK "T8c Chunk 2 upload" || mark FAIL "T8c Chunk 2"
     rm -f "$CHUNK2_RES"
 

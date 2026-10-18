@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -30,17 +30,21 @@ public struct Endpoint {
     public let path: String
     public let queryItems: [URLQueryItem]
 
-    public init(baseURL: URL = Endpoint.baseURL,
-                path: String,
-                queryItems: [URLQueryItem] = []) {
+    public init(
+        baseURL: URL = Endpoint.baseURL,
+        path: String,
+        queryItems: [URLQueryItem] = []
+    ) {
         self.baseURL = baseURL
         self.path = path
         self.queryItems = queryItems
     }
 
     public var url: URL {
-        var components = URLComponents(url: baseURL.appendingPathComponent(path),
-                                       resolvingAgainstBaseURL: false)
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent(path),
+            resolvingAgainstBaseURL: false
+        )
         if !queryItems.isEmpty {
             components?.queryItems = queryItems
         }

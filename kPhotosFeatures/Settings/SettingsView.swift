@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -44,7 +44,7 @@ public struct SettingsView: View {
             .task { await viewModel.loadDrives() }
             .refreshable { await viewModel.loadDrives() }
             .overlay {
-                if viewModel.isLoading && viewModel.drives.isEmpty {
+                if viewModel.isLoading, viewModel.drives.isEmpty {
                     ProgressView()
                 }
             }
@@ -70,7 +70,7 @@ public struct SettingsView: View {
 
     private var drivesSection: some View {
         Section {
-            if viewModel.drives.isEmpty && !viewModel.isLoading {
+            if viewModel.drives.isEmpty, !viewModel.isLoading {
                 Text(L10n.Settings.drivesEmpty)
                     .foregroundStyle(.secondary)
             }

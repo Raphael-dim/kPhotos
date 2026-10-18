@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -89,6 +89,7 @@ public final class TimelineViewModel: ObservableObject {
         public let reason: String
         public var id: String { fileId }
     }
+
     /// Liste des items dont la suppression a échoué définitivement lors du
     /// dernier drain — utilisée par l'UI pour afficher un toast récapitulatif.
     /// Reset à chaque nouveau drain.
@@ -195,7 +196,7 @@ public final class TimelineViewModel: ObservableObject {
     /// disponible côté kDrive, meilleure qualité que la vignette PhotoKit).
     public var orderedViewerMedia: [ViewerMedia] {
         guard case .ready(_, let sections) = state else { return [] }
-        return sections.flatMap { $0.items }.compactMap(viewerMedia(for:))
+        return sections.flatMap(\.items).compactMap(viewerMedia(for:))
     }
 
     /// Convertit un `GalleryItem` en `ViewerMedia` ouvrable. Précédence : cloud
@@ -250,7 +251,7 @@ public final class TimelineViewModel: ObservableObject {
     /// toast.
     @discardableResult
     public func retryAllFailed() async -> Int {
-        let count = (try? await backupQueueWriter.requeueAllPermanentlyFailed()) ?? 0
+        let count = await (try? backupQueueWriter.requeueAllPermanentlyFailed()) ?? 0
         await reconcileBackupQueue()
         return count
     }
@@ -301,8 +302,8 @@ public final class TimelineViewModel: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                guard case .ready(let summary, _) = self.state else { return }
-                self.rebuildState(summary: summary)
+                guard case .ready(let summary, _) = state else { return }
+                rebuildState(summary: summary)
             }
             .store(in: &cancellables)
     }
@@ -328,7 +329,9 @@ public final class TimelineViewModel: ObservableObject {
     private static func indexByLocalId(_ items: [BackupItemSnapshot]) -> [String: BackupItemSnapshot] {
         var dict: [String: BackupItemSnapshot] = [:]
         dict.reserveCapacity(items.count)
-        for item in items { dict[item.localIdentifier] = item }
+        for item in items {
+            dict[item.localIdentifier] = item
+        }
         return dict
     }
 
@@ -336,7 +339,9 @@ public final class TimelineViewModel: ObservableObject {
     private static func indexDeletionsByFileId(_ items: [DeletionItemSnapshot]) -> [String: DeletionItemSnapshot] {
         var dict: [String: DeletionItemSnapshot] = [:]
         dict.reserveCapacity(items.count)
-        for item in items { dict[item.fileId] = item }
+        for item in items {
+            dict[item.fileId] = item
+        }
         return dict
     }
 
@@ -402,7 +407,7 @@ public final class TimelineViewModel: ObservableObject {
         let ids = selectionManager.selectedIds
         return cloudPhotos.filter {
             ids.contains(GalleryItem.cloudOnlyID(fileId: $0.fileId)) ||
-            (!$0.localIdentifier.isEmpty && ids.contains($0.localIdentifier))
+                (!$0.localIdentifier.isEmpty && ids.contains($0.localIdentifier))
         }
     }
 
@@ -481,6 +486,7 @@ public final class TimelineViewModel: ObservableObject {
         public let completed: Int
         public let failed: Int
     }
+
     @Published public private(set) var lastDeletionSummary: DeletionSummary?
 
     /// Lance un drain de la file de suppression. Idempotent — si un drain est
@@ -498,7 +504,7 @@ public final class TimelineViewModel: ObservableObject {
             // ticks → N Task fire-and-forget qui finissent dans le désordre,
             // et la photo restait visible jusqu'au prochain `load()`.
             guard let self else { return }
-            await self.refreshDeletionState(alsoReloadCloud: true)
+            await refreshDeletionState(alsoReloadCloud: true)
         }
         // Sécurité ceinture+bretelles : un dernier refresh complet après la
         // sortie du loop (au cas où le dernier `onProgress` aurait été coupé).
@@ -579,7 +585,7 @@ public final class TimelineViewModel: ObservableObject {
 
         // 1 seul appel API pour N photos grâce au bulk natif kDrive (cf. AlbumManager).
         // On extrait les fileIds depuis selectedPhotos (gère le cas synced / cloud-only).
-        let fileIds = selectedPhotos.map { $0.fileId }
+        let fileIds = selectedPhotos.map(\.fileId)
         try? await albumManager.addPhotos(fileIds: fileIds, toAlbumId: albumId, driveId: drive.id)
     }
 }

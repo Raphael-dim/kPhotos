@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -56,10 +56,10 @@ public final class TimelineManagerImpl: TimelineReading {
     }
 
     /// Fonction pure — testable sans Realm en injectant une Results-like.
-    static func groupByYearMonth<Photos: Sequence>(
-        photos: Photos,
+    static func groupByYearMonth(
+        photos: some Sequence<Photo>,
         calendar: Calendar
-    ) -> [TimelineSection] where Photos.Element == Photo {
+    ) -> [TimelineSection] {
         var buckets: [String: (year: Int, month: Int, ids: [String])] = [:]
         var order: [String] = []
 

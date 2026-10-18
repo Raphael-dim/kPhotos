@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -39,8 +39,10 @@ public protocol RealmAccessor: AnyObject {
 public final class RealmAccessorImpl: RealmAccessor {
     public let configuration: Realm.Configuration
 
-    private let writeQueue = DispatchQueue(label: "app.kphotos.realm.write",
-                                           qos: .utility)
+    private let writeQueue = DispatchQueue(
+        label: "app.kphotos.realm.write",
+        qos: .utility
+    )
 
     public init(configuration: Realm.Configuration = .defaultKPhotos) {
         self.configuration = configuration
@@ -108,7 +110,15 @@ public extension Realm.Configuration {
         //     après crash, retry/backoff, et le badge "deletion in progress" côté UI.
         //     Migration purement additive (nouvelle table, créée vide).
         config.schemaVersion = 8
-        config.objectTypes = [Photo.self, Album.self, SyncCheckpoint.self, Drive.self, SyncSettings.self, BackupItem.self, DeletionItem.self]
+        config.objectTypes = [
+            Photo.self,
+            Album.self,
+            SyncCheckpoint.self,
+            Drive.self,
+            SyncSettings.self,
+            BackupItem.self,
+            DeletionItem.self
+        ]
         config.migrationBlock = { _, _ in
             // No-op : Realm gère automatiquement l'ajout de `BackupItem` / `DeletionItem`
             // (tables créées vides). Les éventuelles tables orphelines sont conservées
@@ -167,13 +177,17 @@ public extension Realm.Configuration {
     /// `Library/Application Support/` n'est pas créé automatiquement dans la sandbox iOS.
     private static func kPhotosRealmURL() -> URL? {
         let fileManager = FileManager.default
-        guard let supportDir = fileManager.urls(for: .applicationSupportDirectory,
-                                                in: .userDomainMask).first else {
+        guard let supportDir = fileManager.urls(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask
+        ).first else {
             return nil
         }
         if !fileManager.fileExists(atPath: supportDir.path) {
-            try? fileManager.createDirectory(at: supportDir,
-                                             withIntermediateDirectories: true)
+            try? fileManager.createDirectory(
+                at: supportDir,
+                withIntermediateDirectories: true
+            )
         }
         return supportDir.appendingPathComponent("kPhotos.realm")
     }
@@ -181,7 +195,15 @@ public extension Realm.Configuration {
     static var inMemoryKPhotos: Realm.Configuration {
         var config = Realm.Configuration()
         config.inMemoryIdentifier = "kPhotos.inMemory.\(UUID().uuidString)"
-        config.objectTypes = [Photo.self, Album.self, SyncCheckpoint.self, Drive.self, SyncSettings.self, BackupItem.self, DeletionItem.self]
+        config.objectTypes = [
+            Photo.self,
+            Album.self,
+            SyncCheckpoint.self,
+            Drive.self,
+            SyncSettings.self,
+            BackupItem.self,
+            DeletionItem.self
+        ]
         return config
     }
 }

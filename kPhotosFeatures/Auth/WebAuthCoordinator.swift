@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@ import UIKit
 public final class WebAuthCoordinator: NSObject, WebAuthorizationProvider {
     private var session: ASWebAuthenticationSession?
 
-    public override init() {}
+    override public init() {}
 
     @MainActor
     public func presentAuthorization(url: URL, callbackScheme: String) async throws -> URL {

@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -16,9 +16,9 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+@testable import kPhotosCore
 import Photos
 import XCTest
-@testable import kPhotosCore
 
 final class PHAssetReaderMappingTests: XCTestCase {
     func testMap_translatesEveryAuthorizationStatus() {
@@ -32,8 +32,10 @@ final class PHAssetReaderMappingTests: XCTestCase {
 
 final class PhotoLibrarySummaryTests: XCTestCase {
     func testEmpty_isAllZero() {
-        XCTAssertEqual(PhotoLibrarySummary.empty,
-                       PhotoLibrarySummary(totalAssets: 0, photosCount: 0, videosCount: 0))
+        XCTAssertEqual(
+            PhotoLibrarySummary.empty,
+            PhotoLibrarySummary(totalAssets: 0, photosCount: 0, videosCount: 0)
+        )
     }
 }
 

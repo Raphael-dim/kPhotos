@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import XCTest
 @testable import kPhotosCore
+import XCTest
 
 /// Tests purs du composer — logique de fusion locale/cloud + résolution d'état.
 /// Pas de Realm, pas de PhotoKit, pas de réseau.
@@ -26,14 +26,18 @@ final class GalleryComposerTests: XCTestCase {
     private let cal = Calendar.iso8601
 
     func testLocalOnly_whenAssetHasNoCloudCounterpart_marksLocalOnly() {
-        let asset = LocalAssetSnapshot(localIdentifier: "L1",
-                                       takenAt: date("2024-06-15"),
-                                       isVideo: false)
+        let asset = LocalAssetSnapshot(
+            localIdentifier: "L1",
+            takenAt: date("2024-06-15"),
+            isVideo: false
+        )
 
-        let sections = composer.compose(localAssets: [asset],
-                                        cloudPhotos: [],
-                                        uploadStates: [:],
-                                        calendar: cal)
+        let sections = composer.compose(
+            localAssets: [asset],
+            cloudPhotos: [],
+            uploadStates: [:],
+            calendar: cal
+        )
 
         XCTAssertEqual(sections.count, 1)
         let item = sections[0].items[0]
@@ -43,15 +47,19 @@ final class GalleryComposerTests: XCTestCase {
     }
 
     func testSynced_whenLocalAssetMatchesCloudPhoto_marksSynced() {
-        let asset = LocalAssetSnapshot(localIdentifier: "L2",
-                                       takenAt: date("2024-06-15"),
-                                       isVideo: false)
+        let asset = LocalAssetSnapshot(
+            localIdentifier: "L2",
+            takenAt: date("2024-06-15"),
+            isVideo: false
+        )
         let cloud = photo(fileId: "F2", localId: "L2", date: date("2024-06-15"))
 
-        let sections = composer.compose(localAssets: [asset],
-                                        cloudPhotos: [cloud],
-                                        uploadStates: [:],
-                                        calendar: cal)
+        let sections = composer.compose(
+            localAssets: [asset],
+            cloudPhotos: [cloud],
+            uploadStates: [:],
+            calendar: cal
+        )
 
         let item = sections[0].items[0]
         XCTAssertEqual(item.syncState, .synced)
@@ -62,10 +70,12 @@ final class GalleryComposerTests: XCTestCase {
     func testCloudOnly_whenCloudPhotoHasNoLocalCounterpart_marksCloudOnly() {
         let cloud = photo(fileId: "F3", localId: "", date: date("2024-05-10"))
 
-        let sections = composer.compose(localAssets: [],
-                                        cloudPhotos: [cloud],
-                                        uploadStates: [:],
-                                        calendar: cal)
+        let sections = composer.compose(
+            localAssets: [],
+            cloudPhotos: [cloud],
+            uploadStates: [:],
+            calendar: cal
+        )
 
         let item = sections[0].items[0]
         XCTAssertEqual(item.syncState, .cloudOnly)
@@ -75,9 +85,11 @@ final class GalleryComposerTests: XCTestCase {
     func testUploadingState_overridesPersistedSyncState() {
         // Cas où le runtime upload est plus à jour que ce que Realm a vu :
         // l'asset n'a pas encore de Photo cloud, mais on est en train de l'uploader.
-        let asset = LocalAssetSnapshot(localIdentifier: "L4",
-                                       takenAt: date("2024-06-15"),
-                                       isVideo: false)
+        let asset = LocalAssetSnapshot(
+            localIdentifier: "L4",
+            takenAt: date("2024-06-15"),
+            isVideo: false
+        )
 
         let sections = composer.compose(
             localAssets: [asset],
@@ -94,9 +106,11 @@ final class GalleryComposerTests: XCTestCase {
         // entre sessions). La source de vérité d'un échec est BackupItem
         // `.failedPermanent`. Quand seul un `.failed` runtime existe sans
         // BackupItem correspondant, on retombe sur l'état cloud / localOnly.
-        let asset = LocalAssetSnapshot(localIdentifier: "L5",
-                                       takenAt: date("2024-06-15"),
-                                       isVideo: false)
+        let asset = LocalAssetSnapshot(
+            localIdentifier: "L5",
+            takenAt: date("2024-06-15"),
+            isVideo: false
+        )
         let cloud = photo(fileId: "F5", localId: "L5", date: date("2024-06-15"))
 
         let sections = composer.compose(
@@ -112,9 +126,11 @@ final class GalleryComposerTests: XCTestCase {
     func testQueuedBackupItem_mapsToPendingUpload() {
         // Cas nominal après reconciliation : l'asset entre en file mais aucun
         // upload n'a encore démarré. Le badge doit indiquer "en attente".
-        let asset = LocalAssetSnapshot(localIdentifier: "L7",
-                                       takenAt: date("2024-06-15"),
-                                       isVideo: false)
+        let asset = LocalAssetSnapshot(
+            localIdentifier: "L7",
+            takenAt: date("2024-06-15"),
+            isVideo: false
+        )
         let item = backupItem(localId: "L7", state: .queued)
 
         let sections = composer.compose(
@@ -131,12 +147,16 @@ final class GalleryComposerTests: XCTestCase {
         // Scénario : sync terminée, `UploadQueue.clearCompleted()` a vidé le
         // runtime, mais BackupItem garde l'état et la cause. Le composer doit
         // exposer la raison pour que l'utilisateur puisse tap le badge orange.
-        let asset = LocalAssetSnapshot(localIdentifier: "L8",
-                                       takenAt: date("2024-06-15"),
-                                       isVideo: false)
-        let item = backupItem(localId: "L8",
-                              state: .failedPermanent,
-                              reason: "Téléchargement iCloud impossible.")
+        let asset = LocalAssetSnapshot(
+            localIdentifier: "L8",
+            takenAt: date("2024-06-15"),
+            isVideo: false
+        )
+        let item = backupItem(
+            localId: "L8",
+            state: .failedPermanent,
+            reason: "Téléchargement iCloud impossible."
+        )
 
         let sections = composer.compose(
             localAssets: [asset],
@@ -154,12 +174,16 @@ final class GalleryComposerTests: XCTestCase {
     func testRuntimeUploadingState_winsOverFailedPermanentBackupItem() {
         // Si une nouvelle tentative est en cours, l'UI doit montrer le spinner
         // (état runtime) et pas l'ancienne erreur persistée.
-        let asset = LocalAssetSnapshot(localIdentifier: "L9",
-                                       takenAt: date("2024-06-15"),
-                                       isVideo: false)
-        let item = backupItem(localId: "L9",
-                              state: .failedPermanent,
-                              reason: "vieux message")
+        let asset = LocalAssetSnapshot(
+            localIdentifier: "L9",
+            takenAt: date("2024-06-15"),
+            isVideo: false
+        )
+        let item = backupItem(
+            localId: "L9",
+            state: .failedPermanent,
+            reason: "vieux message"
+        )
 
         let sections = composer.compose(
             localAssets: [asset],
@@ -175,13 +199,17 @@ final class GalleryComposerTests: XCTestCase {
         // Edge case : un BackupItem `.failedPermanent` orphelin existe encore
         // (par ex. le clear a échoué), mais l'asset est désormais bien présent
         // côté cloud. La présence cloud gagne.
-        let asset = LocalAssetSnapshot(localIdentifier: "L10",
-                                       takenAt: date("2024-06-15"),
-                                       isVideo: false)
+        let asset = LocalAssetSnapshot(
+            localIdentifier: "L10",
+            takenAt: date("2024-06-15"),
+            isVideo: false
+        )
         let cloud = photo(fileId: "F10", localId: "L10", date: date("2024-06-15"))
-        let item = backupItem(localId: "L10",
-                              state: .failedPermanent,
-                              reason: "vieux message")
+        let item = backupItem(
+            localId: "L10",
+            state: .failedPermanent,
+            reason: "vieux message"
+        )
 
         let sections = composer.compose(
             localAssets: [asset],
@@ -197,12 +225,16 @@ final class GalleryComposerTests: XCTestCase {
         // Phase 2a : un échec transient (réseau, 5xx, iCloud temporairement
         // indispo) ne doit PAS afficher de badge orange — l'item sera retenté
         // automatiquement après son `nextRetryAt`. Comportement Google Photos.
-        let asset = LocalAssetSnapshot(localIdentifier: "L20",
-                                       takenAt: date("2024-06-15"),
-                                       isVideo: false)
-        let item = backupItem(localId: "L20",
-                              state: .failedTransient,
-                              reason: "Réseau indisponible")
+        let asset = LocalAssetSnapshot(
+            localIdentifier: "L20",
+            takenAt: date("2024-06-15"),
+            isVideo: false
+        )
+        let item = backupItem(
+            localId: "L20",
+            state: .failedTransient,
+            reason: "Réseau indisponible"
+        )
 
         let sections = composer.compose(
             localAssets: [asset],
@@ -218,9 +250,11 @@ final class GalleryComposerTests: XCTestCase {
         // L'utilisateur a explicitement skipé l'item. Phase 1a : visuellement
         // identique à `.localOnly` (nuage barré). Phase 2 introduira une icône
         // dédiée pour ne pas confondre "pas encore tenté" et "skippé".
-        let asset = LocalAssetSnapshot(localIdentifier: "L11",
-                                       takenAt: date("2024-06-15"),
-                                       isVideo: false)
+        let asset = LocalAssetSnapshot(
+            localIdentifier: "L11",
+            takenAt: date("2024-06-15"),
+            isVideo: false
+        )
         let item = backupItem(localId: "L11", state: .skipped, reason: "user choice")
 
         let sections = composer.compose(
@@ -237,13 +271,15 @@ final class GalleryComposerTests: XCTestCase {
         let assets = [
             LocalAssetSnapshot(localIdentifier: "A", takenAt: date("2024-06-15"), isVideo: false),
             LocalAssetSnapshot(localIdentifier: "B", takenAt: date("2024-05-30"), isVideo: false),
-            LocalAssetSnapshot(localIdentifier: "C", takenAt: date("2024-06-01"), isVideo: false),
+            LocalAssetSnapshot(localIdentifier: "C", takenAt: date("2024-06-01"), isVideo: false)
         ]
 
-        let sections = composer.compose(localAssets: assets,
-                                        cloudPhotos: [],
-                                        uploadStates: [:],
-                                        calendar: cal)
+        let sections = composer.compose(
+            localAssets: assets,
+            cloudPhotos: [],
+            uploadStates: [:],
+            calendar: cal
+        )
 
         XCTAssertEqual(sections.count, 2)
         XCTAssertEqual(sections[0].month, 6, "Mois le plus récent en premier")
@@ -254,15 +290,19 @@ final class GalleryComposerTests: XCTestCase {
 
     func testNoDuplicate_whenLocalAndCloudShareLocalIdentifier() {
         // On NE veut PAS deux items pour la même photo (un local + un cloud).
-        let asset = LocalAssetSnapshot(localIdentifier: "L6",
-                                       takenAt: date("2024-06-15"),
-                                       isVideo: false)
+        let asset = LocalAssetSnapshot(
+            localIdentifier: "L6",
+            takenAt: date("2024-06-15"),
+            isVideo: false
+        )
         let cloud = photo(fileId: "F6", localId: "L6", date: date("2024-06-15"))
 
-        let sections = composer.compose(localAssets: [asset],
-                                        cloudPhotos: [cloud],
-                                        uploadStates: [:],
-                                        calendar: cal)
+        let sections = composer.compose(
+            localAssets: [asset],
+            cloudPhotos: [cloud],
+            uploadStates: [:],
+            calendar: cal
+        )
 
         XCTAssertEqual(sections[0].items.count, 1)
     }
@@ -275,10 +315,12 @@ final class GalleryComposerTests: XCTestCase {
         return f.date(from: iso) ?? Date()
     }
 
-    private func photo(fileId: String,
-                       localId: String,
-                       date: Date,
-                       status: PhotoSyncStatus = .synced) -> PhotoSnapshot {
+    private func photo(
+        fileId: String,
+        localId: String,
+        date: Date,
+        status: PhotoSyncStatus = .synced
+    ) -> PhotoSnapshot {
         PhotoSnapshot(
             id: fileId,
             driveId: 1,
@@ -296,9 +338,11 @@ final class GalleryComposerTests: XCTestCase {
         )
     }
 
-    private func backupItem(localId: String,
-                            state: BackupItemState,
-                            reason: String = "") -> BackupItemSnapshot {
+    private func backupItem(
+        localId: String,
+        state: BackupItemState,
+        reason: String = ""
+    ) -> BackupItemSnapshot {
         let failed = state == .failedPermanent || state == .failedTransient
         return BackupItemSnapshot(
             localIdentifier: localId,

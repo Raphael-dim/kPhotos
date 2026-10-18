@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -11,6 +11,9 @@
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 import kPhotosCore
@@ -131,8 +134,11 @@ public struct PhotoMapView: View {
                         selectedPhotos = SelectedPhotos(
                             photos: group.photos,
                             title: group.placeName
-                                ?? String(format: "%.2f, %.2f",
-                                          group.centerLatitude, group.centerLongitude),
+                                ?? String(
+                                    format: "%.2f, %.2f",
+                                    group.centerLatitude,
+                                    group.centerLongitude
+                                ),
                             // Pas de geocoding fin : à l'échelle d'un cluster
                             // 50km, le centre n'est pas représentatif d'une rue.
                             preciseCoordinate: nil
@@ -151,9 +157,11 @@ public struct PhotoMapView: View {
     /// géolocalisées. La région inclut tous les points pour donner une vue
     /// d'ensemble. Pas de clusters MapKit ici — c'est purement décoratif.
     private func miniMapPreview(points: [PhotoMapPoint]) -> some View {
-        Map(coordinateRegion: .constant(Self.boundingRegion(for: points)),
+        Map(
+            coordinateRegion: .constant(Self.boundingRegion(for: points)),
             interactionModes: [],
-            annotationItems: points) { point in
+            annotationItems: points
+        ) { point in
             MapAnnotation(coordinate: CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude)) {
                 Circle()
                     .fill(Color.accentColor)
@@ -161,7 +169,7 @@ public struct PhotoMapView: View {
                     .overlay(Circle().stroke(.white, lineWidth: 1.5))
             }
         }
-        .allowsHitTesting(false)  // Garantit que le tap part bien sur le conteneur (open full map)
+        .allowsHitTesting(false) // Garantit que le tap part bien sur le conteneur (open full map)
     }
 
     /// Coordonnée moyenne des points correspondant aux photos tappées.

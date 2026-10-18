@@ -1,4 +1,20 @@
 #!/usr/bin/env bash
+# kPhotos - iOS client for kDrive
+# Copyright (C) 2026 Raphaël Dimeck
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 # kPhotos — kDrive API empirical test suite.
 # Probes what's possible with a given PAT against the real kDrive API.
 #
@@ -11,7 +27,7 @@
 #   export TEST_FOLDER_ID='your_test_folder_id'  # a folder you already own
 #   ./scripts/api_test.sh
 #
-# Each test prints: URL called, request body, HTTP status, response body, interpretation.
+# Each test prints: URL called, request body, HTTP status and a response summary.
 # A summary table at the end shows which operations work.
 
 set -uo pipefail
@@ -39,9 +55,10 @@ declare -a RESULTS=()
 format_body() {
     local body="$1"
     if [[ $HAS_JQ -eq 1 ]]; then
-        echo "$body" | jq -C '.' 2>/dev/null | head -40 || echo "$body" | head -c 800
+        echo "$body" | jq -C '{result: .result, error_code: .error.code}' 2>/dev/null \
+            || echo "  (response body omitted)"
     else
-        echo "$body" | head -c 800
+        echo "  (response body omitted; install jq for a safe summary)"
     fi
 }
 

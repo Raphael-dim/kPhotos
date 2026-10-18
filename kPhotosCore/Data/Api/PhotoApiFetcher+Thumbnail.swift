@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -11,6 +11,9 @@
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 import Alamofire
@@ -22,7 +25,7 @@ public extension PhotoApiFetcher {
         let endpoint = Endpoint.thumbnail(driveId: driveId, fileId: fileId)
         return try await performWithRetry { [weak self] in
             guard let self else { throw PhotoAPIError.network(underlying: "fetcher deallocated") }
-            return try await self.requestThumbnail(endpoint: endpoint)
+            return try await requestThumbnail(endpoint: endpoint)
         }
     }
 
@@ -40,10 +43,12 @@ public extension PhotoApiFetcher {
         }
 
         if let error = response.error {
-            throw Self.mapAFError(error,
-                                  statusCode: response.response?.statusCode,
-                                  url: endpoint.url,
-                                  body: response.data)
+            throw Self.mapAFError(
+                error,
+                statusCode: response.response?.statusCode,
+                url: endpoint.url,
+                body: response.data
+            )
         }
 
         throw PhotoAPIError.invalidResponse

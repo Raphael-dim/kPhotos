@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -11,6 +11,9 @@
  but WITHOUT ANY WARRANTY; without even the implied warranty of
  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 import Foundation
@@ -139,13 +142,13 @@ public final class PhotoSyncEngine: PhotoSyncing {
         // - déjà connus de la file persistante (peu importe l'état : queued, uploading,
         //   completed, failedPermanent, skipped). Ne pas re-insérer un item `.skipped`
         //   automatiquement — l'utilisateur l'a explicitement écarté.
-        let syncedIdentifiers: Set<String> = Set(
-            (try photoReader.allPhotos())
+        let syncedIdentifiers: Set<String> = try Set(
+            (photoReader.allPhotos())
                 .map(\.localIdentifier)
                 .filter { !$0.isEmpty }
         )
-        let knownIdentifiers: Set<String> = Set(
-            (try backupQueueReader.allItems()).map(\.localIdentifier)
+        let knownIdentifiers: Set<String> = try Set(
+            (backupQueueReader.allItems()).map(\.localIdentifier)
         )
 
         for asset in localAssets {
@@ -276,9 +279,11 @@ public final class PhotoSyncEngine: PhotoSyncing {
     /// Charge le `PHAsset` depuis PhotoKit, l'exporte, upload via API, persiste
     /// le snapshot cloud. `clientToken` vient de `BackupItem` → idempotent côté
     /// serveur même si un retry rejoue la requête après réponse perdue.
-    private func uploadOne(item: BackupItemSnapshot,
-                           driveId: Int,
-                           folderId: String) async throws -> PhotoSnapshot {
+    private func uploadOne(
+        item: BackupItemSnapshot,
+        driveId: Int,
+        folderId: String
+    ) async throws -> PhotoSnapshot {
         let fetch = PHAsset.fetchAssets(withLocalIdentifiers: [item.localIdentifier], options: nil)
         guard let asset = fetch.firstObject else {
             // L'asset a été supprimé localement entre l'enqueue et le drain.
@@ -397,7 +402,7 @@ public enum BackupRetryClassifier {
         }
         if let apiError = error as? PhotoAPIError {
             switch apiError {
-            case .network, .rateLimited, .server(statusCode: 500..<600, _):
+            case .network, .rateLimited, .server(statusCode: 500 ..< 600, _):
                 // Réseau / 429 / 5xx — backoff agressif. `performWithRetry` côté
                 // fetcher en aura déjà mangé 3 ; à ce stade c'est qu'on a un
                 // vrai problème persistant à court terme.

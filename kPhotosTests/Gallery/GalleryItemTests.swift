@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import XCTest
 @testable import kPhotosCore
+import XCTest
 
 final class GalleryItemTests: XCTestCase {
     func testFromCloud_forcesSyncedAndCopiesCloudIds() {
@@ -45,9 +45,11 @@ final class ViewerMediaTests: XCTestCase {
     }
 
     func testLocalCase_exposesPrefixedIdAndNotCloudBacked() {
-        let asset = LocalAssetSnapshot(localIdentifier: "L1",
-                                       takenAt: Date(timeIntervalSince1970: 5000),
-                                       isVideo: false)
+        let asset = LocalAssetSnapshot(
+            localIdentifier: "L1",
+            takenAt: Date(timeIntervalSince1970: 5000),
+            isVideo: false
+        )
         let media = ViewerMedia.local(asset)
 
         XCTAssertEqual(media.id, "local-L1")

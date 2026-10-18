@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -31,27 +31,27 @@ enum APILog {
     static let logger = Logger(subsystem: "app.kphotos", category: "api")
 
     static func request(method: String, url: URL, body: Any?) {
-        let bodyDesc = body.map { "\($0)" } ?? "—"
-        logger.info("→ \(method, privacy: .public) \(url.absoluteString, privacy: .private)\n   body: \(bodyDesc, privacy: .private)")
+        let operation = ["thumbnail", "preview", "download", "files", "init", "chunk"].contains(url.lastPathComponent)
+            ? url.lastPathComponent : "metadata"
+        logger.info("→ \(method, privacy: .public) \(operation, privacy: .public)")
     }
 
     static func response(url: URL, statusCode: Int?, body: Data?) {
-        let bodyDesc = body.flatMap { String(data: $0, encoding: .utf8) }?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? "—"
-        let trimmed = String(bodyDesc.prefix(2000))
-        logger.info("← \(statusCode.map(String.init) ?? "?", privacy: .public) \(url.absoluteString, privacy: .private)\n   body: \(trimmed, privacy: .private)")
+        logger.info("← \(statusCode ?? 0, privacy: .public)")
     }
 }
 
 public protocol PhotoApiFetching: AnyObject {
     func listFolder(driveId: Int, folderId: String, cursor: String?, limit: Int) async throws -> FilePage
-    func upload(driveId: Int,
-                folderId: String,
-                fileURL: URL,
-                fileName: String,
-                createdAt: Date,
-                mimeType: String,
-                clientToken: String) async throws -> RemoteFileDTO
+    func upload(
+        driveId: Int,
+        folderId: String,
+        fileURL: URL,
+        fileName: String,
+        createdAt: Date,
+        mimeType: String,
+        clientToken: String
+    ) async throws -> RemoteFileDTO
     func createDirectory(driveId: Int, name: String, parentId: String) async throws -> RemoteDirectoryDTO
     func listDrives() async throws -> [RemoteDriveDTO]
 
@@ -109,7 +109,7 @@ public extension JSONDecoder {
 extension PhotoApiFetcher {
     func performWithRetry<T>(_ operation: @escaping () async throws -> T) async throws -> T {
         var lastError: Error?
-        for attempt in 0..<Self.maxRetries {
+        for attempt in 0 ..< Self.maxRetries {
             do {
                 return try await operation()
             } catch {
@@ -126,17 +126,19 @@ extension PhotoApiFetcher {
         switch error {
         case PhotoAPIError.network,
              PhotoAPIError.rateLimited,
-             PhotoAPIError.server(statusCode: 500..<600, _):
+             PhotoAPIError.server(statusCode: 500 ..< 600, _):
             return true
         default:
             return false
         }
     }
 
-    static func mapAFError(_ error: AFError,
-                           statusCode: Int? = nil,
-                           url: URL? = nil,
-                           body: Data? = nil) -> PhotoAPIError {
+    static func mapAFError(
+        _ error: AFError,
+        statusCode: Int? = nil,
+        url: URL? = nil,
+        body: Data? = nil
+    ) -> PhotoAPIError {
         if let url { APILog.response(url: url, statusCode: statusCode, body: body) }
         let bodySnippet = body.flatMap { String(data: $0, encoding: .utf8) }?
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -153,7 +155,7 @@ extension PhotoApiFetcher {
             case 401, 403: return .unauthorized
             case 404: return .notFound
             case 429: return .rateLimited(retryAfter: nil)
-            case 500..<600: return .server(statusCode: code, message: message)
+            case 500 ..< 600: return .server(statusCode: code, message: message)
             default: return .server(statusCode: code, message: message)
             }
         }

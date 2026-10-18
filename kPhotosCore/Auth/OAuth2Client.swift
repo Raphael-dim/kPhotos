@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -32,8 +32,10 @@ public final class OAuth2Client {
     }
 
     public func buildAuthorizationURL(state: String, pkce: PKCEChallenge) -> URL {
-        var components = URLComponents(url: config.authorizationEndpoint,
-                                       resolvingAgainstBaseURL: false)!
+        var components = URLComponents(
+            url: config.authorizationEndpoint,
+            resolvingAgainstBaseURL: false
+        )!
         // Infomaniak n'utilise pas de paramètre `scope` — la portée est implicite au niveau du compte
         // (cf. github.com/Infomaniak/ios-login). `access_type=offline` est requis pour récupérer un refresh_token.
         components.queryItems = [
@@ -111,7 +113,7 @@ public final class OAuth2Client {
         guard let http = response as? HTTPURLResponse else {
             throw AuthError.invalidResponse
         }
-        guard (200..<300).contains(http.statusCode) else {
+        guard (200 ..< 300).contains(http.statusCode) else {
             let snippet = String(data: data, encoding: .utf8) ?? "no body"
             throw AuthError.tokenExchangeFailed(reason: "HTTP \(http.statusCode): \(snippet)")
         }

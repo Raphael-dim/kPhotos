@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -98,7 +98,7 @@ public final class SyncSettingsManagerImpl: SyncSettingsManaging {
                 switch change {
                 case .initial(let r), .update(let r, _, _, _):
                     if let entity = r.first(where: { $0.id == 0 }) {
-                        self.subject.send(SyncSettingsSnapshot(entity))
+                        subject.send(SyncSettingsSnapshot(entity))
                     }
                 case .error:
                     break

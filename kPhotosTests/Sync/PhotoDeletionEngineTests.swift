@@ -1,6 +1,6 @@
 /*
  kPhotos - iOS client for kDrive
- Copyright (C) 2025 Raphaël Dimeck
+ Copyright (C) 2026 Raphaël Dimeck
 
  This program is free software: you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
@@ -16,8 +16,8 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import XCTest
 @testable import kPhotosCore
+import XCTest
 
 /// Classifier de retry côté suppression — pendant de `BackupRetryClassifier`.
 /// Backoff plus court (base 15s) car un DELETE est léger côté serveur.
@@ -34,11 +34,13 @@ final class DeletionRetryClassifierTests: XCTestCase {
 
     func testRateLimitedAndServer5xx_areTransient() {
         guard case .transient = DeletionRetryClassifier.classify(
-            error: PhotoAPIError.rateLimited(retryAfter: nil), attemptCount: 1) else {
+            error: PhotoAPIError.rateLimited(retryAfter: nil), attemptCount: 1
+        ) else {
             return XCTFail("rateLimited doit être transient")
         }
         guard case .transient = DeletionRetryClassifier.classify(
-            error: PhotoAPIError.server(statusCode: 503, message: nil), attemptCount: 1) else {
+            error: PhotoAPIError.server(statusCode: 503, message: nil), attemptCount: 1
+        ) else {
             return XCTFail("5xx doit être transient")
         }
     }
@@ -58,7 +60,8 @@ final class DeletionRetryClassifierTests: XCTestCase {
         )
         XCTAssertEqual(
             DeletionRetryClassifier.classify(
-                error: PhotoAPIError.server(statusCode: 403, message: nil), attemptCount: 1),
+                error: PhotoAPIError.server(statusCode: 403, message: nil), attemptCount: 1
+            ),
             .permanent
         )
     }
@@ -66,14 +69,16 @@ final class DeletionRetryClassifierTests: XCTestCase {
     func testDecodingError_isPermanent() {
         XCTAssertEqual(
             DeletionRetryClassifier.classify(
-                error: PhotoAPIError.decoding(underlying: "x"), attemptCount: 1),
+                error: PhotoAPIError.decoding(underlying: "x"), attemptCount: 1
+            ),
             .permanent
         )
     }
 
     func testNonApiError_isTransient() {
         guard case .transient = DeletionRetryClassifier.classify(
-            error: CocoaError(.fileNoSuchFile), attemptCount: 1) else {
+            error: CocoaError(.fileNoSuchFile), attemptCount: 1
+        ) else {
             return XCTFail("Une erreur inconnue doit être retentée au moins une fois")
         }
     }
@@ -97,9 +102,11 @@ final class DeletionRetryClassifierTests: XCTestCase {
 /// Drain de la file de suppression — orchestration séquentielle DELETE + transitions.
 final class PhotoDeletionEngineTests: XCTestCase {
     func testDrain_emptyQueue_returnsZeroResult() async {
-        let engine = makeEngine(reader: FakeDeletionQueueReader(),
-                                writer: FakeDeletionQueueWriter(),
-                                api: FakeDeletionApi())
+        let engine = makeEngine(
+            reader: FakeDeletionQueueReader(),
+            writer: FakeDeletionQueueWriter(),
+            api: FakeDeletionApi()
+        )
         let result = await engine.drain { _ in }
         XCTAssertEqual(result, DeletionSessionResult(completed: 0, failedPermanently: 0, failedTransiently: 0))
     }
@@ -150,8 +157,11 @@ final class PhotoDeletionEngineTests: XCTestCase {
         let writer = FakeDeletionQueueWriter()
         _ = await makeEngine(reader: FakeDeletionQueueReader(), writer: writer, api: FakeDeletionApi())
             .drain { _ in }
-        XCTAssertEqual(writer.resetOrphanedCallCount, 1,
-                       "Le drain doit balayer les items bloqués en .deleting avant de traiter")
+        XCTAssertEqual(
+            writer.resetOrphanedCallCount,
+            1,
+            "Le drain doit balayer les items bloqués en .deleting avant de traiter"
+        )
     }
 
     func testDrain_reportsProgressFromZeroToTotal() async {
@@ -178,9 +188,11 @@ final class PhotoDeletionEngineTests: XCTestCase {
 
     // MARK: - Helpers
 
-    private func makeEngine(reader: DeletionQueueReading,
-                            writer: DeletionQueueWriting,
-                            api: PhotoApiFetching) -> PhotoDeletionEngine {
+    private func makeEngine(
+        reader: DeletionQueueReading,
+        writer: DeletionQueueWriting,
+        api: PhotoApiFetching
+    ) -> PhotoDeletionEngine {
         PhotoDeletionEngine(api: api, deletionQueueReader: reader, deletionQueueWriter: writer)
     }
 
@@ -207,6 +219,7 @@ private final class FakeDeletionQueueReader: DeletionQueueReading {
     func deletionItem(fileId: String) throws -> DeletionItemSnapshot? {
         items.first { $0.fileId == fileId }
     }
+
     func pendingDeletionFileIds() throws -> Set<String> { Set(items.map(\.fileId)) }
 }
 
@@ -223,9 +236,11 @@ private final class FakeDeletionQueueWriter: DeletionQueueWriting {
     func markDeletionFailedTransient(fileId: String, reason: String, nextRetryAt: Date) async throws {
         markedFailedTransient.append(fileId)
     }
+
     func markDeletionFailedPermanent(fileId: String, reason: String) async throws {
         markedFailedPermanent.append(fileId)
     }
+
     func cancelDeletion(fileId: String) async throws {}
     func requeueDeletion(fileId: String) async throws {}
     func resetOrphanedDeletions() async throws -> Int { resetOrphanedCallCount += 1; return 0 }
@@ -245,37 +260,53 @@ private final class FakeDeletionApi: PhotoApiFetching {
     func listFolder(driveId: Int, folderId: String, cursor: String?, limit: Int) async throws -> FilePage {
         throw PhotoAPIError.invalidResponse
     }
-    func upload(driveId: Int, folderId: String, fileURL: URL, fileName: String,
-                createdAt: Date, mimeType: String, clientToken: String) async throws -> RemoteFileDTO {
+
+    func upload(
+        driveId: Int,
+        folderId: String,
+        fileURL: URL,
+        fileName: String,
+        createdAt: Date,
+        mimeType: String,
+        clientToken: String
+    ) async throws -> RemoteFileDTO {
         throw PhotoAPIError.invalidResponse
     }
+
     func createDirectory(driveId: Int, name: String, parentId: String) async throws -> RemoteDirectoryDTO {
         throw PhotoAPIError.invalidResponse
     }
+
     func listDrives() async throws -> [RemoteDriveDTO] { [] }
     func listCategories(driveId: Int) async throws -> [RemoteCategoryDTO] { [] }
     func createCategory(driveId: Int, name: String, color: String?) async throws -> RemoteCategoryDTO {
         throw PhotoAPIError.invalidResponse
     }
+
     func updateCategory(driveId: Int, categoryId: Int, name: String?, color: String?) async throws -> RemoteCategoryDTO {
         throw PhotoAPIError.invalidResponse
     }
+
     func deleteCategory(driveId: Int, categoryId: Int) async throws {}
     func addCategoryToFiles(driveId: Int, categoryId: Int, fileIds: [Int]) async throws {}
     func removeCategoryFromFiles(driveId: Int, categoryId: Int, fileIds: [Int]) async throws {}
     func listCategoryFiles(driveId: Int, categoryId: Int, cursor: String?, limit: Int) async throws -> FilePage {
         throw PhotoAPIError.invalidResponse
     }
+
     func thumbnailData(driveId: Int, fileId: String) async throws -> Data { Data() }
     func previewData(driveId: Int, fileId: String, width: Int?, height: Int?, quality: Int?) async throws -> Data {
         Data()
     }
+
     func downloadURL(driveId: Int, fileId: String) -> URL {
         Endpoint.download(driveId: driveId, fileId: fileId).url
     }
+
     func previewURL(driveId: Int, fileId: String) -> URL {
         Endpoint.preview(driveId: driveId, fileId: fileId).url
     }
+
     func fileInfo(driveId: Int, fileId: String) async throws -> RemoteFileDetailDTO {
         throw PhotoAPIError.invalidResponse
     }
