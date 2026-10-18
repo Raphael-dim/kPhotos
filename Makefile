@@ -5,7 +5,8 @@ SIMULATOR ?= iPhone 17
 SCHEME    ?= kPhotos
 TUIST     ?= mise exec -- tuist
 
-.PHONY: help setup install generate open build run-sim test dead-code check-secrets check-headers lint lint-ci format format-check clean
+.PHONY: help setup install generate open build run-sim test dead-code clean
+.PHONY: check-secrets check-headers check-realm lint lint-ci format format-check
 
 help: ## Affiche l'aide
 	@grep -E '^[a-zA-Z_-]+:.*?## ' Makefile | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -63,10 +64,13 @@ check-secrets: ## Vérifie les secrets dans les fichiers publiables et l’histo
 check-headers: ## Vérifie les en-têtes et l'attribution de tous les sources
 	python3 scripts/check_headers.py
 
-lint: check-headers ## Lint SwiftLint
+check-realm: ## Vérifie le script de compatibilité Realm
+	python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+
+lint: check-headers check-realm ## Lint SwiftLint
 	mise exec -- swiftlint lint --strict --no-cache
 
-lint-ci: check-headers ## Lint avec les règles strictes de CI
+lint-ci: check-headers check-realm ## Lint avec les règles strictes de CI
 	mise exec -- swiftlint lint --strict --no-cache --config .swiftlint-ci.yml
 
 format: ## Format SwiftFormat
