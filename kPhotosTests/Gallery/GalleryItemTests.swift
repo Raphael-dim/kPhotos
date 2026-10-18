@@ -76,9 +76,18 @@ final class LocalAssetSnapshotIdentityTests: XCTestCase {
 
 private func makePhotoSnapshot(fileId: String, driveId: Int, isVideo: Bool) -> PhotoSnapshot {
     PhotoSnapshot(
-        id: fileId, driveId: driveId, localIdentifier: "", name: "\(fileId).jpg",
-        takenAt: Date(timeIntervalSince1970: 1000), uploadedAt: Date(timeIntervalSince1970: 2000),
-        mimeType: isVideo ? "video/quicktime" : "image/jpeg", size: 0, isVideo: isVideo,
-        duration: 0, albumIds: [], syncStatus: .synced, isFavorite: false
+        id: fileId,
+        driveId: driveId,
+        localIdentifier: "",
+        name: "\(fileId).jpg",
+        takenAt: Date(timeIntervalSince1970: 1000),
+        uploadedAt: Date(timeIntervalSince1970: 2000),
+        mimeType: isVideo ? "video/quicktime" : "image/jpeg",
+        size: 0,
+        isVideo: isVideo,
+        duration: 0,
+        albumIds: [],
+        syncStatus: .synced,
+        isFavorite: false
     )
 }

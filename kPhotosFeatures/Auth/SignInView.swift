@@ -16,7 +16,7 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import kPhotosCore
+import kPhotosCoreUI
 import kPhotosResources
 import SwiftUI
 import UIKit
@@ -87,7 +87,7 @@ private struct TokenTutorialView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(L10n.Common.close) { dismiss() }
+                    Button(L10n.Common.close, role: .appClose) { dismiss() }
                 }
             }
         }

@@ -33,7 +33,7 @@ public enum BackgroundSyncIdentifiers {
 }
 
 public protocol BackgroundSyncScheduling: AnyObject {
-    /// À appeler une fois au lancement de l'app (`kPhotosApp.init`).
+    /// À appeler une fois au lancement de l'app (`KPhotosApp.init`).
     /// Enregistre les handlers BGTask et observe les réglages utilisateur pour
     /// planifier ou annuler en conséquence.
     func bootstrap()
@@ -86,7 +86,7 @@ public final class BackgroundSyncScheduler: BackgroundSyncScheduling {
 
     public func bootstrap() {
         // Register doit être appelé AVANT la fin de `application:didFinishLaunching`,
-        // d'où l'invocation depuis `kPhotosApp.init`. Sinon crash au prochain run.
+        // d'où l'invocation depuis `KPhotosApp.init`. Sinon crash au prochain run.
         BGTaskScheduler.shared.register(
             forTaskWithIdentifier: BackgroundSyncIdentifiers.appRefresh,
             using: nil

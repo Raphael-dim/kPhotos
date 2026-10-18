@@ -41,6 +41,7 @@ public struct SettingsView: View {
                 accountSection
             }
             .navigationTitle(L10n.Settings.title)
+            .navigationBarTitleDisplayMode(.large)
             .task { await viewModel.loadDrives() }
             .refreshable { await viewModel.loadDrives() }
             .overlay {
@@ -93,6 +94,7 @@ public struct SettingsView: View {
                         }
                     }
                 }
+                .buttonStyle(.plain)
             }
             if let error = viewModel.errorMessage {
                 Text(error)
@@ -119,9 +121,10 @@ public struct SettingsView: View {
                     }
                     Spacer()
                     Image(systemName: "folder")
-                        .foregroundStyle(.blue)
+                        .foregroundStyle(.secondary)
                 }
             }
+            .buttonStyle(.plain)
         } footer: {
             Text(L10n.Settings.folderFooter)
         }

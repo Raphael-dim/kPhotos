@@ -19,17 +19,6 @@
 import Foundation
 
 public enum L10n {
-    public enum BackupSafety {
-        public static let incomplete = key("backup.safety.incomplete")
-        public static let integrity = key("backup.safety.integrity")
-        public static let tooLarge = key("backup.safety.tooLarge")
-        public static let busy = key("backup.safety.busy")
-        public static let preview = key("backup.safety.preview")
-        public static func partial(completed: Int, total: Int) -> String {
-            String(format: key("backup.safety.partial"), completed, total)
-        }
-    }
-
     public enum Backup {
         public static let title = key("backup.status.title")
         public static let checking = key("backup.status.checking")
@@ -108,8 +97,18 @@ public enum L10n {
         public static let resume = key("places.status.resume")
     }
 
+    public enum BackupSafety {
+        public static let incomplete = key("backup.safety.incomplete")
+        public static let integrity = key("backup.safety.integrity")
+        public static let tooLarge = key("backup.safety.tooLarge")
+        public static let busy = key("backup.safety.busy")
+        public static let preview = key("backup.safety.preview")
+        public static func partial(completed: Int, total: Int) -> String {
+            String(format: key("backup.safety.partial"), completed, total)
+        }
+    }
+
     public enum Common {
-        public static let more = key("common.more")
         public static let cancel = key("common.cancel")
         public static let confirm = key("common.confirm")
         public static let delete = key("common.delete")
@@ -118,6 +117,7 @@ public enum L10n {
         public static let retry = key("common.retry")
         public static let close = key("common.close")
         public static let done = key("common.done")
+        public static let more = key("common.more")
         public static let create = key("common.create")
     }
 

@@ -37,6 +37,21 @@ public struct ErrorStateView: View {
     }
 
     public var body: some View {
+        if #available(iOS 17.0, *) {
+            ContentUnavailableView {
+                Label(title, systemImage: "exclamationmark.triangle")
+            } description: {
+                Text(message)
+            } actions: {
+                Button(retryTitle, action: onRetry)
+                    .buttonStyle(.borderedProminent)
+            }
+        } else {
+            legacyContent
+        }
+    }
+
+    private var legacyContent: some View {
         VStack(spacing: 12) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 36, weight: .light))

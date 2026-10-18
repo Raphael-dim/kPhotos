@@ -83,9 +83,8 @@ public struct AlbumDetailView: View {
             }
     }
 
-    @ToolbarContentBuilder
-    private var albumMenu: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
+    @ToolbarContentBuilder private var albumMenu: some ToolbarContent {
+        ToolbarItem(placement: .appPrimaryAction) {
             Menu {
                 Button {
                     renameText = viewModel.album.name
@@ -115,11 +114,11 @@ public struct AlbumDetailView: View {
             .navigationTitle(L10n.Albums.renameTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(L10n.Common.cancel) { isRenamePresented = false }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.Common.cancel, role: .cancel) { isRenamePresented = false }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(L10n.Common.confirm) {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L10n.Common.confirm, role: .appConfirmation) {
                         Task {
                             await viewModel.rename(to: renameText)
                             isRenamePresented = false
@@ -131,8 +130,7 @@ public struct AlbumDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private var content: some View {
+    @ViewBuilder private var content: some View {
         if viewModel.isLoading, viewModel.photos.isEmpty {
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let error = viewModel.errorMessage {

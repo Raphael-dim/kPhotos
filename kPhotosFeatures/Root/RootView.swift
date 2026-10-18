@@ -60,6 +60,9 @@ final class RootViewModel: ObservableObject {
 }
 
 struct MainTabsView: View {
+    private enum AppTab: Hashable { case timeline, map, albums, settings }
+
+    @State private var selection: AppTab = .timeline
     private let onSignedOut: () -> Void
 
     init(onSignedOut: @escaping () -> Void) {
@@ -67,23 +70,49 @@ struct MainTabsView: View {
     }
 
     var body: some View {
-        TabView {
+        if #available(iOS 26.0, *) {
+            modernTabs
+                .tabBarMinimizeBehavior(.never)
+        } else if #available(iOS 18.0, *) {
+            modernTabs
+        } else {
+            legacyTabs
+        }
+    }
+
+    @available(iOS 18.0, *)
+    private var modernTabs: some View {
+        TabView(selection: $selection) {
+            Tab(L10n.Timeline.title, systemImage: "photo.on.rectangle", value: AppTab.timeline) {
+                TimelineView()
+            }
+            Tab(L10n.Map.tabTitle, systemImage: "map", value: AppTab.map) {
+                PhotoMapView()
+            }
+            Tab(L10n.Albums.title, systemImage: "rectangle.stack", value: AppTab.albums) {
+                AlbumsView()
+            }
+            Tab(L10n.Settings.title, systemImage: "gearshape", value: AppTab.settings) {
+                SettingsView(onSignedOut: onSignedOut)
+            }
+        }
+        .tabViewStyle(.sidebarAdaptable)
+    }
+
+    private var legacyTabs: some View {
+        TabView(selection: $selection) {
             TimelineView()
-                .tabItem {
-                    Label(L10n.Timeline.title, systemImage: "photo.on.rectangle")
-                }
+                .tabItem { Label(L10n.Timeline.title, systemImage: "photo.on.rectangle") }
+                .tag(AppTab.timeline)
             PhotoMapView()
-                .tabItem {
-                    Label(L10n.Map.tabTitle, systemImage: "map")
-                }
+                .tabItem { Label(L10n.Map.tabTitle, systemImage: "map") }
+                .tag(AppTab.map)
             AlbumsView()
-                .tabItem {
-                    Label(L10n.Albums.title, systemImage: "rectangle.stack")
-                }
+                .tabItem { Label(L10n.Albums.title, systemImage: "rectangle.stack") }
+                .tag(AppTab.albums)
             SettingsView(onSignedOut: onSignedOut)
-                .tabItem {
-                    Label(L10n.Settings.title, systemImage: "gearshape")
-                }
+                .tabItem { Label(L10n.Settings.title, systemImage: "gearshape") }
+                .tag(AppTab.settings)
         }
     }
 }

@@ -17,10 +17,12 @@
  */
 
 import kPhotosCore
+import kPhotosCoreUI
 import kPhotosResources
 import SwiftUI
 
 struct AlbumPickerSheet: View {
+    @Environment(\.dismiss) private var dismiss
     let albums: [AlbumSnapshot]
     let onSelect: (AlbumSnapshot) -> Void
 
@@ -33,8 +35,13 @@ struct AlbumPickerSheet: View {
                     }
                 }
             }
-            .navigationTitle("Add to Album")
+            .navigationTitle(L10n.Viewer.selectAlbumTitle)
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.Common.close, role: .appClose) { dismiss() }
+                }
+            }
         }
     }
 }

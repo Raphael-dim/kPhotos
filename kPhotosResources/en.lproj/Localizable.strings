@@ -48,6 +48,7 @@
 
 // Timeline
 "timeline.title" = "My Photos";
+"timeline.fastScroll" = "Fast scroll through photos";
 "timeline.empty.title" = "No photos yet";
 "timeline.empty.subtitle" = "Your photos will appear here once they are backed up to kDrive.";
 "timeline.library.title" = "Library detected";
@@ -60,6 +61,8 @@
 "timeline.noDrive.title" = "No kDrive selected";
 "timeline.noDrive.subtitle" = "Go to Settings to pick a destination kDrive.";
 "timeline.sync.action" = "Sync";
+"timeline.sync.preparing" = "Preparing backup…";
+"timeline.sync.progress" = "Backup: %d of %d items processed";
 "timeline.sync.done" = "%d photo(s) backed up.";
 "timeline.section.count" = "%d item(s)";
 "timeline.section.more" = "+%d more";
@@ -149,6 +152,9 @@
 
 // Viewer
 "viewer.addToAlbum" = "Add to album";
+"viewer.live.motion" = "Play Live";
+"viewer.live.still" = "Photo";
+"viewer.live.unavailable" = "This Live Photo’s motion could not be played.";
 "viewer.saveToLibrary" = "Save to Library";
 "viewer.saveToLibrarySuccess" = "Saved to Library";
 "viewer.delete" = "Delete";
@@ -213,58 +219,6 @@
 // Common additional
 "common.create" = "Create";
 
-"signIn.pat.tutorial.page" = "%d / %d";
-
-"map.metadata.progress" = "Preparing places: %d / %d";
-
-"map.metadata.failures" = "Could not read metadata for %d file(s).";
-
-"map.metadata.complete" = "Complete places";
-
-"map.metadata.help" = "A first scan of all originals may take several hours. Your gallery remains available.";
-
-"map.metadata.suspend" = "Pause";
-
-"map.metadata.limited" = "Metadata was only partially read for %d items. Missing GPS has not been confirmed.";
-
-"common.more" = "More options";
-
-"places.status.title" = "Place preparation";
-
-"places.status.checking" = "Finding places";
-
-"places.status.running" = "Preparing places";
-
-"places.status.paused" = "Preparation paused";
-
-"places.status.waiting" = "Preparation waiting";
-
-"places.status.attention" = "Places need attention";
-
-"places.status.complete" = "Places up to date";
-
-"places.status.completeDetail" = "The map is ready to explore";
-
-"places.status.help" = "kPhotos reads locations from your originals over Wi-Fi. This preparation does not modify your files and is separate from backup uploads.";
-
-"places.status.noGPS" = "A photo without a GPS location can be fully processed without appearing on the map.";
-
-"places.status.processed" = "Items processed";
-
-"places.status.resume" = "Resume preparation";
-
-"places.status.processedCount" = "%@ of %@";
-
-"places.status.progress" = "%@ of %@ items processed";
-
-"places.status.inProgress" = "Processing";
-
-"timeline.fastScroll" = "Fast scroll through photos";
-
-"timeline.sync.preparing" = "Preparing backup…";
-
-"timeline.sync.progress" = "Backup: %d of %d items processed";
-
 "backup.safety.incomplete" = "The backup is incomplete: a resource belonging to this photo is unavailable. Originals are preserved.";
 
 "backup.safety.integrity" = "The received content does not match the original. This item is not marked as backed up.";
@@ -277,90 +231,84 @@
 
 "backup.safety.partial" = "Backup incomplete: %d of %d media items verified. Check the gallery errors to retry.";
 
+"viewer.info.fallbackDate" = "Fallback date";
+"viewer.info.fallbackDateExplanation" = "Capture date unconfirmed. The timeline uses a kDrive file date.";
+
 "timeline.cloud.loading" = "Loading kDrive photos and videos…";
 
+"map.metadata.progress" = "Preparing places: %d / %d";
+"viewer.info.embeddedLocalDate" = "Capture (local EXIF time)";
+"viewer.info.embeddedLocalDateExplanation" = "The file does not specify its time zone. The EXIF wall clock is preserved; UTC conversion remains uncertain.";
+
+"map.metadata.failures" = "Could not read metadata for %d file(s).";
+
+"map.metadata.complete" = "Complete places";
+
+"map.metadata.help" = "A first scan of all originals may take several hours. Your gallery remains available.";
+
+"map.metadata.suspend" = "Pause";
+
+"map.metadata.limited" = "Metadata was only partially read for %d items. Missing GPS has not been confirmed.";
+
+"common.more" = "More options";
+"viewer.info.type.photo" = "Photo";
+"viewer.info.type.video" = "Video";
+
+"signIn.pat.tutorial.page" = "%d / %d";
+
+/* Backup overview and details */
 "backup.status.title" = "Backup";
-
 "backup.status.checking" = "Checking backup";
-
 "backup.status.saving" = "Backing up";
-
 "backup.status.waiting" = "Backup waiting";
-
 "backup.status.attention" = "Backup needs attention";
-
 "backup.status.upToDate" = "Everything is backed up";
-
 "backup.status.selectionComplete" = "Selection backed up";
-
 "backup.status.accessRequired" = "Photos access required";
-
 "backup.status.empty" = "Nothing to back up";
-
 "backup.status.checkingDetail" = "Comparing with backed up originals";
-
 "backup.status.emptyDetail" = "New photos will appear here";
-
 "backup.status.accessDetail" = "Allow Photos access to check this iPhone";
-
 "backup.status.checkFailed" = "The check could not finish";
-
 "backup.status.allSaved" = "%d items · Up to date";
-
 "backup.status.selectionSaved" = "%d selected items up to date";
-
 "backup.status.remaining" = "%d items to back up";
-
 "backup.status.savedCount" = "%d of %d items backed up";
-
 "backup.status.uploading" = "Uploading";
-
 "backup.status.queued" = "Waiting";
-
 "backup.status.retrying" = "Retry scheduled";
-
 "backup.status.failed" = "Backup failed";
-
 "backup.status.skipped" = "Skipped · Not backed up";
-
 "backup.status.unverified" = "Backup needs verification";
-
 "backup.status.queue" = "Items to back up";
-
 "backup.status.viewQueue" = "View all %d items";
-
 "backup.status.lastRun" = "Last attempt";
-
 "backup.status.automaticOn" = "Automatic backup is on.";
-
 "backup.status.automaticOff" = "Automatic backup is off. Start a backup or enable it in options.";
-
 "backup.status.selectedScope" = "This status covers only the selected media types and photos kPhotos can access.";
-
 "backup.status.lastUpload" = "Last upload";
-
 "backup.status.backgroundHelp" = "iOS decides when backup can continue in the background. Open the app to follow uploads.";
-
 "backup.status.nextAttempt" = "Retry at %@";
+
+/* Place preparation details */
+"places.status.title" = "Place preparation";
+"places.status.checking" = "Finding places";
+"places.status.running" = "Preparing places";
+"places.status.paused" = "Preparation paused";
+"places.status.waiting" = "Preparation waiting";
+"places.status.attention" = "Places need attention";
+"places.status.complete" = "Places up to date";
+"places.status.completeDetail" = "The map is ready to explore";
+"places.status.help" = "kPhotos reads locations from your originals over Wi-Fi. This preparation does not modify your files and is separate from backup uploads.";
+"places.status.noGPS" = "A photo without a GPS location can be fully processed without appearing on the map.";
+"places.status.processed" = "Items processed";
+"places.status.resume" = "Resume preparation";
+"places.status.processedCount" = "%@ of %@";
+
+"places.status.progress" = "%@ of %@ items processed";
+
+"places.status.inProgress" = "Processing";
 
 "backup.status.automaticOffComplete" = "Automatic backup is off. Enable it in options for your next photos.";
 
 "backup.status.deviceScope" = "Photos and videos on this iPhone";
-
-"viewer.info.type.photo" = "Photo";
-
-"viewer.info.type.video" = "Video";
-
-"viewer.live.motion" = "Play Live";
-
-"viewer.live.still" = "Photo";
-
-"viewer.live.unavailable" = "This Live Photo’s motion could not be played.";
-
-"viewer.info.fallbackDate" = "Fallback date";
-
-"viewer.info.fallbackDateExplanation" = "Capture date unconfirmed. The timeline uses a kDrive file date.";
-
-"viewer.info.embeddedLocalDate" = "Capture (local EXIF time)";
-
-"viewer.info.embeddedLocalDateExplanation" = "The file does not specify its time zone. The EXIF wall clock is preserved; UTC conversion remains uncertain.";

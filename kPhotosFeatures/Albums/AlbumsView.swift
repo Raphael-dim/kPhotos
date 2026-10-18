@@ -71,9 +71,8 @@ public struct AlbumsView: View {
         }
     }
 
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .topBarTrailing) {
+    @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .appPrimaryAction) {
             Button {
                 newAlbumName = ""
                 isCreatePresented = true
@@ -83,8 +82,7 @@ public struct AlbumsView: View {
         }
     }
 
-    @ViewBuilder
-    private var content: some View {
+    @ViewBuilder private var content: some View {
         switch viewModel.state {
         case .loading:
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -166,11 +164,11 @@ public struct AlbumsView: View {
             .navigationTitle(L10n.Albums.create)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(L10n.Common.cancel) { isCreatePresented = false }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.Common.cancel, role: .cancel) { isCreatePresented = false }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(L10n.Common.confirm) {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L10n.Common.confirm, role: .appConfirmation) {
                         Task {
                             await viewModel.createAlbum(name: newAlbumName)
                             isCreatePresented = false
@@ -193,11 +191,11 @@ public struct AlbumsView: View {
             .navigationTitle(L10n.Albums.renameTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(L10n.Common.cancel) { albumToRename = nil }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.Common.cancel, role: .cancel) { albumToRename = nil }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(L10n.Common.confirm) {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L10n.Common.confirm, role: .appConfirmation) {
                         Task {
                             await viewModel.renameAlbum(albumId: album.id, name: renameText)
                             albumToRename = nil

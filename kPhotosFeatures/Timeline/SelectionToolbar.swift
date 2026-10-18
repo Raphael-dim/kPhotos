@@ -16,7 +16,6 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import kPhotosResources
 import SwiftUI
 
 /// Toolbar du mode sélection — pilule glass flottante au-dessus de la safe area.
@@ -45,7 +44,7 @@ struct SelectionToolbar: View {
             // Compteur discret : juste le nombre, sans label "selected".
             // `monospacedDigit` évite que la pilule respire quand le compteur
             // passe de 9 → 10 → 99 → 100.
-            Text("\(selectedCount)")
+            Text(selectedCount, format: .number)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()

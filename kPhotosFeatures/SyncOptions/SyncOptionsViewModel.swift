@@ -81,7 +81,8 @@ public final class SyncOptionsViewModel: ObservableObject {
                 cellular: cellular,
                 photos: mediaPair.0,
                 videos: mediaPair.1
-            ) }
+            )
+            }
         }
         .store(in: &cancellables)
     }

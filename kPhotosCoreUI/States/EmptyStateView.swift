@@ -40,6 +40,23 @@ public struct EmptyStateView: View {
     }
 
     public var body: some View {
+        if #available(iOS 17.0, *) {
+            ContentUnavailableView {
+                Label(title, systemImage: systemImage)
+            } description: {
+                Text(subtitle)
+            } actions: {
+                if let actionTitle, let action {
+                    Button(actionTitle, action: action)
+                        .buttonStyle(.borderedProminent)
+                }
+            }
+        } else {
+            legacyContent
+        }
+    }
+
+    private var legacyContent: some View {
         VStack(spacing: 16) {
             Image(systemName: systemImage)
                 .font(.system(size: 40, weight: .light))

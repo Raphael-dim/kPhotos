@@ -16,6 +16,7 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import kPhotosCoreUI
 import kPhotosResources
 import SwiftUI
 
@@ -42,8 +43,8 @@ public struct SyncOptionsView: View {
             .navigationTitle(L10n.SyncOptions.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(L10n.Common.done) { dismiss() }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L10n.Common.done, role: .appClose) { dismiss() }
                 }
             }
         }

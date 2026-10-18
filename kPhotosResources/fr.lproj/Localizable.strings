@@ -49,6 +49,7 @@
 
 // Timeline
 "timeline.title" = "Mes photos";
+"timeline.fastScroll" = "Défilement rapide des photos";
 "timeline.empty.title" = "Aucune photo pour le moment";
 "timeline.empty.subtitle" = "Vos photos apparaîtront ici dès qu'elles seront sauvegardées sur kDrive.";
 "timeline.library.title" = "Photothèque détectée";
@@ -61,6 +62,8 @@
 "timeline.noDrive.title" = "Aucun kDrive sélectionné";
 "timeline.noDrive.subtitle" = "Va dans Réglages pour choisir le kDrive de destination.";
 "timeline.sync.action" = "Synchroniser";
+"timeline.sync.preparing" = "Préparation de la sauvegarde…";
+"timeline.sync.progress" = "Sauvegarde : %d sur %d médias traités";
 "timeline.sync.done" = "%d photo(s) sauvegardée(s).";
 "timeline.section.count" = "%d élément(s)";
 "timeline.section.more" = "+%d en plus";
@@ -150,6 +153,9 @@
 
 // Viewer
 "viewer.addToAlbum" = "Ajouter à un album";
+"viewer.live.motion" = "Animer";
+"viewer.live.still" = "Photo";
+"viewer.live.unavailable" = "Impossible de lire l’animation de cette Live Photo.";
 "viewer.saveToLibrary" = "Enregistrer dans la Photothèque";
 "viewer.saveToLibrarySuccess" = "Enregistré dans la Photothèque";
 "viewer.delete" = "Supprimer";
@@ -214,58 +220,6 @@
 // Common additional
 "common.create" = "Créer";
 
-"signIn.pat.tutorial.page" = "%d / %d";
-
-"map.metadata.progress" = "Préparation des lieux : %d / %d";
-
-"map.metadata.failures" = "Métadonnées non lues pour %d fichier(s).";
-
-"map.metadata.complete" = "Compléter les lieux";
-
-"map.metadata.help" = "Une première analyse de tous les originaux peut prendre plusieurs heures. La galerie reste disponible.";
-
-"map.metadata.suspend" = "Suspendre";
-
-"map.metadata.limited" = "Métadonnées partiellement lues pour %d médias. Leur absence de GPS n’est pas confirmée.";
-
-"common.more" = "Plus d’options";
-
-"places.status.title" = "Préparation des lieux";
-
-"places.status.checking" = "Recherche des lieux";
-
-"places.status.running" = "Préparation des lieux";
-
-"places.status.paused" = "Préparation en pause";
-
-"places.status.waiting" = "Préparation en attente";
-
-"places.status.attention" = "Lieux à compléter";
-
-"places.status.complete" = "Lieux à jour";
-
-"places.status.completeDetail" = "La carte est prête à explorer";
-
-"places.status.help" = "kPhotos lit les lieux dans vos originaux sur le Wi-Fi. Cette préparation ne modifie pas vos fichiers et ne correspond pas à un envoi de sauvegarde.";
-
-"places.status.noGPS" = "Une photo sans position GPS peut être entièrement analysée sans apparaître sur la carte.";
-
-"places.status.processed" = "Éléments analysés";
-
-"places.status.resume" = "Reprendre la préparation";
-
-"places.status.processedCount" = "%@ sur %@";
-
-"places.status.progress" = "%@ sur %@ éléments analysés";
-
-"places.status.inProgress" = "Analyse en cours";
-
-"timeline.fastScroll" = "Défilement rapide des photos";
-
-"timeline.sync.preparing" = "Préparation de la sauvegarde…";
-
-"timeline.sync.progress" = "Sauvegarde : %d sur %d médias traités";
-
 "backup.safety.incomplete" = "La sauvegarde est incomplète : une ressource de cette photo est indisponible. Les originaux sont conservés.";
 
 "backup.safety.integrity" = "Le contenu reçu ne correspond pas à l’original. Ce média n’est pas marqué comme sauvegardé.";
@@ -278,90 +232,84 @@
 
 "backup.safety.partial" = "Sauvegarde incomplète : %d média(s) vérifié(s) sur %d. Consulte les erreurs dans la galerie pour réessayer.";
 
+"viewer.info.fallbackDate" = "Date de repli";
+"viewer.info.fallbackDateExplanation" = "Date de prise de vue non confirmée. Le classement utilise une date du fichier kDrive.";
+
 "timeline.cloud.loading" = "Chargement des photos et vidéos kDrive…";
 
+"map.metadata.progress" = "Préparation des lieux : %d / %d";
+"viewer.info.embeddedLocalDate" = "Prise de vue (heure EXIF locale)";
+"viewer.info.embeddedLocalDateExplanation" = "Le fichier ne précise pas le fuseau horaire. L’heure EXIF est conservée ; la conversion UTC reste incertaine.";
+
+"map.metadata.failures" = "Métadonnées non lues pour %d fichier(s).";
+
+"map.metadata.complete" = "Compléter les lieux";
+
+"map.metadata.help" = "Une première analyse de tous les originaux peut prendre plusieurs heures. La galerie reste disponible.";
+
+"map.metadata.suspend" = "Suspendre";
+
+"map.metadata.limited" = "Métadonnées partiellement lues pour %d médias. Leur absence de GPS n’est pas confirmée.";
+
+"common.more" = "Plus d’options";
+"viewer.info.type.photo" = "Photo";
+"viewer.info.type.video" = "Vidéo";
+
+"signIn.pat.tutorial.page" = "%d / %d";
+
+/* Backup overview and details */
 "backup.status.title" = "Sauvegarde";
-
 "backup.status.checking" = "Vérification de la sauvegarde";
-
 "backup.status.saving" = "Sauvegarde en cours";
-
 "backup.status.waiting" = "Sauvegarde en attente";
-
 "backup.status.attention" = "Sauvegarde à compléter";
-
 "backup.status.upToDate" = "Tout est sauvegardé";
-
 "backup.status.selectionComplete" = "Sélection sauvegardée";
-
 "backup.status.accessRequired" = "Accès aux photos requis";
-
 "backup.status.empty" = "Aucun élément à sauvegarder";
-
 "backup.status.checkingDetail" = "Comparaison avec les originaux sauvegardés";
-
 "backup.status.emptyDetail" = "Les nouvelles photos apparaîtront ici";
-
 "backup.status.accessDetail" = "Autorisez Photos pour vérifier cet iPhone";
-
 "backup.status.checkFailed" = "La vérification n’a pas pu se terminer";
-
 "backup.status.allSaved" = "%d éléments · À jour";
-
 "backup.status.selectionSaved" = "%d éléments de la sélection à jour";
-
 "backup.status.remaining" = "%d éléments à sauvegarder";
-
 "backup.status.savedCount" = "%d sur %d éléments sauvegardés";
-
 "backup.status.uploading" = "En cours d’envoi";
-
 "backup.status.queued" = "En attente";
-
 "backup.status.retrying" = "Nouvelle tentative prévue";
-
 "backup.status.failed" = "Échec de la sauvegarde";
-
 "backup.status.skipped" = "Ignoré · Non sauvegardé";
-
 "backup.status.unverified" = "Sauvegarde à vérifier";
-
 "backup.status.queue" = "Éléments à sauvegarder";
-
 "backup.status.viewQueue" = "Voir les %d éléments";
-
 "backup.status.lastRun" = "Dernière tentative";
-
 "backup.status.automaticOn" = "La sauvegarde automatique est activée.";
-
 "backup.status.automaticOff" = "La sauvegarde automatique est désactivée. Lancez un envoi ou activez-la dans les options.";
-
 "backup.status.selectedScope" = "Ce statut concerne uniquement les types de médias choisis et les photos auxquelles kPhotos a accès.";
-
 "backup.status.lastUpload" = "Dernier envoi";
-
 "backup.status.backgroundHelp" = "En arrière-plan, iOS décide quand la sauvegarde peut continuer. Ouvrez l’app pour suivre les envois.";
-
 "backup.status.nextAttempt" = "Nouvelle tentative à %@";
+
+/* Place preparation details */
+"places.status.title" = "Préparation des lieux";
+"places.status.checking" = "Recherche des lieux";
+"places.status.running" = "Préparation des lieux";
+"places.status.paused" = "Préparation en pause";
+"places.status.waiting" = "Préparation en attente";
+"places.status.attention" = "Lieux à compléter";
+"places.status.complete" = "Lieux à jour";
+"places.status.completeDetail" = "La carte est prête à explorer";
+"places.status.help" = "kPhotos lit les lieux dans vos originaux sur le Wi-Fi. Cette préparation ne modifie pas vos fichiers et ne correspond pas à un envoi de sauvegarde.";
+"places.status.noGPS" = "Une photo sans position GPS peut être entièrement analysée sans apparaître sur la carte.";
+"places.status.processed" = "Éléments analysés";
+"places.status.resume" = "Reprendre la préparation";
+"places.status.processedCount" = "%@ sur %@";
+
+"places.status.progress" = "%@ sur %@ éléments analysés";
+
+"places.status.inProgress" = "Analyse en cours";
 
 "backup.status.automaticOffComplete" = "La sauvegarde automatique est désactivée. Activez-la dans les options pour vos prochaines photos.";
 
 "backup.status.deviceScope" = "Photos et vidéos de cet iPhone";
-
-"viewer.info.type.photo" = "Photo";
-
-"viewer.info.type.video" = "Vidéo";
-
-"viewer.live.motion" = "Animer";
-
-"viewer.live.still" = "Photo";
-
-"viewer.live.unavailable" = "Impossible de lire l’animation de cette Live Photo.";
-
-"viewer.info.fallbackDate" = "Date de repli";
-
-"viewer.info.fallbackDateExplanation" = "Date de prise de vue non confirmée. Le classement utilise une date du fichier kDrive.";
-
-"viewer.info.embeddedLocalDate" = "Prise de vue (heure EXIF locale)";
-
-"viewer.info.embeddedLocalDateExplanation" = "Le fichier ne précise pas le fuseau horaire. L’heure EXIF est conservée ; la conversion UTC reste incertaine.";
