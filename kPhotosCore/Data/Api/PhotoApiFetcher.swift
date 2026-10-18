@@ -28,13 +28,13 @@ import os
 enum APILog {
     static let logger = Logger(subsystem: "app.kphotos", category: "api")
 
-    static func request(method: String, url: URL, body: Any?) {
+    static func request(method: String, url: URL, body _: Any?) {
         let operation = ["thumbnail", "preview", "download", "files", "init", "chunk"].contains(url.lastPathComponent)
             ? url.lastPathComponent : "metadata"
         logger.info("→ \(method, privacy: .public) \(operation, privacy: .public)")
     }
 
-    static func response(url: URL, statusCode: Int?, body: Data?) {
+    static func response(url _: URL, statusCode: Int?, body _: Data?) {
         logger.info("← \(statusCode ?? 0, privacy: .public)")
     }
 }
@@ -62,6 +62,7 @@ public protocol PhotoApiFetching: AnyObject {
     func addCategoryToFiles(driveId: Int, categoryId: Int, fileIds: [Int]) async throws
     func removeCategoryFromFiles(driveId: Int, categoryId: Int, fileIds: [Int]) async throws
     func listCategoryFiles(driveId: Int, categoryId: Int, cursor: String?, limit: Int) async throws -> FilePage
+    func thumbnailPackData(driveId: Int, reference: ThumbnailPackReference) async throws -> Data
     func thumbnailData(driveId: Int, fileId: String) async throws -> Data
     func thumbnailData(driveId: Int, fileId: String, revision: String, priority: Int) async throws -> Data
     func previewData(driveId: Int, fileId: String, width: Int?, height: Int?, quality: Int?) async throws -> Data
@@ -95,6 +96,10 @@ public extension PhotoApiFetching {
         throw PhotoAPIError.invalidResponse
     }
 
+    func thumbnailPackData(
+        driveId: Int,
+        reference: ThumbnailPackReference
+    ) async throws -> Data { throw PhotoAPIError.invalidResponse }
     func mediaIndex(driveId: Int, rootId: String) async throws -> (String, MediaLibraryIndex)? { nil }
     func originalMetadata(driveId: Int, fileId: String, isVideo: Bool) async throws -> EmbeddedMediaMetadata {
         throw PhotoAPIError.invalidResponse

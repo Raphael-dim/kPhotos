@@ -372,7 +372,9 @@ private struct PlaceThumbnailImage: View {
         self.photo = photo
         _loader = StateObject(wrappedValue: ThumbnailLoader(
             driveId: photo.driveId,
-            fileId: photo.fileId
+            fileId: photo.fileId,
+            pack: photo.thumbnailPack,
+            revision: photo.remoteRevision
         ))
     }
 
@@ -389,6 +391,7 @@ private struct PlaceThumbnailImage: View {
             }
         }
         .task(id: photo.remoteRevision + (photo.thumbnailPack?.sha256 ?? "")) {
+            loader.configure(pack: photo.thumbnailPack, revision: photo.remoteRevision)
             await loader.load()
         }
     }
@@ -503,7 +506,9 @@ private struct MapSheetThumbnail: View {
         self.photo = photo
         _loader = StateObject(wrappedValue: ThumbnailLoader(
             driveId: photo.driveId,
-            fileId: photo.fileId
+            fileId: photo.fileId,
+            pack: photo.thumbnailPack,
+            revision: photo.remoteRevision
         ))
     }
 
@@ -535,6 +540,7 @@ private struct MapSheetThumbnail: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             .task(id: photo.remoteRevision + (photo.thumbnailPack?.sha256 ?? "")) {
+                loader.configure(pack: photo.thumbnailPack, revision: photo.remoteRevision)
                 await loader.load()
             }
         }

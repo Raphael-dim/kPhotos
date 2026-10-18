@@ -154,6 +154,7 @@ public final class GalleryComposerImpl: GalleryComposing {
                 cloudDriveId: cloud?.driveId,
                 syncState: state
             )
+            item.thumbnailPack = cloud?.thumbnailPack; item.remoteRevision = cloud?.remoteRevision ?? ""
             items.append(item)
         }
 
@@ -178,6 +179,7 @@ public final class GalleryComposerImpl: GalleryComposing {
                 cloudDriveId: cloud.driveId,
                 syncState: state
             )
+            item.thumbnailPack = cloud.thumbnailPack; item.remoteRevision = cloud.remoteRevision
             items.append(item)
         }
 

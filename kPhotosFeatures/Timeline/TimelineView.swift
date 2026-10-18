@@ -88,12 +88,11 @@ private struct DeletionFailureSheet: Identifiable {
 
 public struct TimelineView: View {
     @StateObject private var viewModel = TimelineViewModel()
-    @State private var isShowingBackupDetails = false
-    @Environment(\.scenePhase) private var scenePhase
     @State private var detailedError: String?
     @State private var itemFailureSheet: ItemFailureSheet?
     @State private var deletionFailureSheet: DeletionFailureSheet?
-    @State private var isShowingSyncOptions = false
+    @State private var isShowingBackupDetails = false
+    @Environment(\.scenePhase) private var scenePhase
     @State private var viewerPresentation: ViewerPresentation?
     @Namespace private var viewerNamespace
     @State private var navigationTitle = L10n.Timeline.title
@@ -183,7 +182,7 @@ public struct TimelineView: View {
         NavigationStack {
             content
                 .navigationTitle(navigationTitle)
-                .navigationBarTitleDisplayMode(.automatic)
+                .navigationBarTitleDisplayMode(.large)
                 .task { await viewModel.load() }
                 .toolbar { toolbarContent }
                 .sheet(isPresented: $isShowingBackupDetails) {
@@ -191,9 +190,6 @@ public struct TimelineView: View {
                 }
                 .onChange(of: scenePhase) { phase in
                     if phase == .active { viewModel.refreshLocalBackupInventory() }
-                }
-                .sheet(isPresented: $isShowingSyncOptions) {
-                    SyncOptionsView()
                 }
                 .sheet(isPresented: Binding(
                     get: { detailedError != nil },
@@ -214,8 +210,8 @@ public struct TimelineView: View {
                         onClose: { viewerPresentation = nil }
                     )
                 }
-                // Selection toolbar
-                .overlay(alignment: .bottom) {
+                // Reserve room for selection actions instead of covering the last row.
+                .safeAreaInset(edge: .bottom, spacing: 0) {
                     if viewModel.isSelectionModeActive {
                         SelectionToolbar(
                             selectedCount: viewModel.selectionManager.count,
@@ -371,8 +367,7 @@ public struct TimelineView: View {
         if toast?.id == id { toast = nil }
     }
 
-    @ViewBuilder
-    private var errorDetailSheet: some View {
+    @ViewBuilder private var errorDetailSheet: some View {
         NavigationStack {
             ScrollView {
                 Text(detailedError ?? "")
@@ -505,8 +500,7 @@ public struct TimelineView: View {
         }
     }
 
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
+    @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {
         ToolbarItem(placement: .appPrimaryAction) {
             if case .ready = viewModel.state {
                 Button { isShowingBackupDetails = true } label: {
@@ -523,29 +517,12 @@ public struct TimelineView: View {
         }
     }
 
-    /// Pendant la synchronisation, on affiche une fine progression circulaire
-    /// autour d'un icône cloud minuscule. Subtile et informative — le pourcentage
-    /// est lisible au coin d'œil sans saturer la toolbar.
-    @ViewBuilder
-    private var syncMenuLabel: some View {
-        switch viewModel.syncState {
-        case .running(let progress) where progress.total > 0:
-            CircularSyncIndicator(progress: progress.fraction)
-        case .running:
-            // Total inconnu au tout début : on a juste un spinner indéterminé.
-            ProgressView().controlSize(.small)
-        case .idle, .finished, .failed:
-            Image(systemName: "icloud.and.arrow.up")
-        }
-    }
-
     private var isSyncing: Bool {
         if case .running = viewModel.syncState { return true }
         return false
     }
 
-    @ViewBuilder
-    private var content: some View {
+    @ViewBuilder private var content: some View {
         switch viewModel.state {
         case .loading:
             ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -623,87 +600,88 @@ public struct TimelineView: View {
             // ScrollViewReader = pré-requis pour l'auto-scroll programmatique
             // pendant le drag-select aux bords (scrollTo(id, anchor:)).
             ScrollViewReader { scrollProxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: sectionSpacing) {
-                        libraryActivity.padding(.horizontal, 16)
-                        // Sonde invisible placée À L'INTÉRIEUR du content de la
-                        // ScrollView : on remonte la chaîne de superviews pour
-                        // capter le `UIScrollView` UIKit sous-jacent à la SwiftUI
-                        // ScrollView. Permet ensuite de piloter le scroll en
-                        // `setContentOffset(_:animated:)` (qui marche même avec
-                        // `isScrollEnabled = false`) au lieu de passer par
-                        // `ScrollViewProxy.scrollTo` qui peut être bloqué par
-                        // `.scrollDisabled(...)`.
-                        ScrollViewIntrospector { sv in
-                            if underlyingScrollView !== sv {
-                                underlyingScrollView = sv
+                ZStack(alignment: .trailing) {
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: sectionSpacing) {
+                            libraryActivity
+                                .padding(.horizontal, 20)
+
+                            ForEach(sections, id: \.id) { section in
+                                sectionRow(section, tileSize: tileSize, gridSpacing: gridSpacing)
                             }
                         }
-                        .frame(width: 0, height: 0)
-
-                        // Sonde de pinch — branche un `UIPinchGestureRecognizer`
-                        // sur l'`UIScrollView` sous-jacent pour piloter le zoom
-                        // de densité avec l'épicentre exact du geste.
-                        pinchDetector(scrollProxy: scrollProxy)
+                        .padding(.vertical, 16)
+                        .background(alignment: .topLeading) {
+                            // Probes stay inside the scroll hierarchy without taking space between rows.
+                            ScrollViewIntrospector { scrollView in
+                                if underlyingScrollView !== scrollView { underlyingScrollView = scrollView }
+                            }
                             .frame(width: 0, height: 0)
-
-                        ForEach(sections, id: \.id) { section in
-                            sectionRow(section, tileSize: tileSize, gridSpacing: gridSpacing)
+                            pinchDetector(scrollProxy: scrollProxy)
+                                .frame(width: 0, height: 0)
+                        }
+                        // Transformation homothétique du pinch, ancrée sur l'épicentre
+                        // du geste : le contenu sous le point médian des doigts reste
+                        // strictement fixe pendant tout le zoom (cf. PinchZoomDetector).
+                        .scaleEffect(gestureScale, anchor: gestureAnchor)
+                    }
+                    .coordinateSpace(name: "timelineScroll")
+                    // Le rail tactile dédié recouvre le bord droit et pilote ce même
+                    // UIScrollView. L'indicateur natif trop étroit est masqué.
+                    .scrollIndicators(.hidden)
+                    // Pendant le drag-select on bloque le pan utilisateur — sinon
+                    // tirer le doigt vers le bas ferait remonter la grille (sens
+                    // naturel du pan), l'inverse de ce qu'on veut. L'auto-scroll
+                    // utilise `setContentOffset` via l'introspecteur, qui n'est
+                    // PAS affecté par `scrollDisabled`.
+                    .scrollDisabled(dragSelectAnchorId != nil)
+                    // Le geste long-press + drag-to-select est posé UNE SEULE FOIS sur la
+                    // ScrollView (pas par tile). C'est crucial pour le scroll : attacher un
+                    // geste à chaque tile bloque les touches au niveau de la tile et
+                    // empêche la ScrollView de voir le pan. Ici, en simultaneousGesture sur
+                    // la ScrollView elle-même, on coexiste avec le pan natif d'UIScrollView.
+                    // Pendant les 500ms d'attente, si le doigt glisse, le long-press
+                    // se cancel et le scroll prend naturellement. La tile sous le doigt
+                    // est résolue via hit-test sur `tileFrames` (publiés par chaque tile
+                    // via PreferenceKey).
+                    .simultaneousGesture(dragSelectionGesture(scrollProxy: scrollProxy))
+                    .refreshable {
+                        await viewModel.refreshCloud()
+                    }
+                    .background(
+                        GeometryReader { scrollGeo in
+                            Color.clear.preference(
+                                key: ScrollFramePreferenceKey.self,
+                                value: scrollGeo.frame(in: .global)
+                            )
+                        }
+                    )
+                    .onPreferenceChange(SectionAnchorPreferenceKey.self) { positions in
+                        let threshold: CGFloat = -90
+                        if let current = positions
+                            .filter({ $0.value < threshold })
+                            .max(by: { $0.value < $1.value }) {
+                            navigationTitle = current.key
+                        } else {
+                            navigationTitle = L10n.Timeline.title
                         }
                     }
-                    .padding(.vertical, 16)
-                    // Transformation homothétique du pinch, ancrée sur l'épicentre
-                    // du geste : le contenu sous le point médian des doigts reste
-                    // strictement fixe pendant tout le zoom (cf. PinchZoomDetector).
-                    .scaleEffect(gestureScale, anchor: gestureAnchor)
-                }
-                .coordinateSpace(name: "timelineScroll")
-                // Scrubber natif iOS : indicateur de scroll visible sur la droite.
-                .scrollIndicators(.visible)
-                // Pendant le drag-select on bloque le pan utilisateur — sinon
-                // tirer le doigt vers le bas ferait remonter la grille (sens
-                // naturel du pan), l'inverse de ce qu'on veut. L'auto-scroll
-                // utilise `setContentOffset` via l'introspecteur, qui n'est
-                // PAS affecté par `scrollDisabled`.
-                .scrollDisabled(dragSelectAnchorId != nil)
-                // Le geste long-press + drag-to-select est posé UNE SEULE FOIS sur la
-                // ScrollView (pas par tile). C'est crucial pour le scroll : attacher un
-                // geste à chaque tile bloque les touches au niveau de la tile et
-                // empêche la ScrollView de voir le pan. Ici, en simultaneousGesture sur
-                // la ScrollView elle-même, on coexiste avec le pan natif d'UIScrollView.
-                // Pendant les 500ms d'attente, si le doigt glisse, le long-press
-                // se cancel et le scroll prend naturellement. La tile sous le doigt
-                // est résolue via hit-test sur `tileFrames` (publiés par chaque tile
-                // via PreferenceKey).
-                .simultaneousGesture(dragSelectMasterGesture(scrollProxy: scrollProxy))
-                .refreshable {
-                    await viewModel.refreshCloud()
-                }
-                .background(
-                    GeometryReader { scrollGeo in
-                        Color.clear.preference(
-                            key: ScrollFramePreferenceKey.self,
-                            value: scrollGeo.frame(in: .global)
-                        )
+                    .onPreferenceChange(TileFramePreferenceKey.self) { frames in
+                        tileFrames = frames
                     }
-                )
-                .onPreferenceChange(SectionAnchorPreferenceKey.self) { positions in
-                    let threshold: CGFloat = -90
-                    if let current = positions
-                        .filter({ $0.value < threshold })
-                        .max(by: { $0.value < $1.value }) {
-                        navigationTitle = current.key
-                    } else {
-                        navigationTitle = L10n.Timeline.title
+                    .onPreferenceChange(ScrollFramePreferenceKey.self) { frame in
+                        scrollViewGlobalFrame = frame
                     }
+
+                    .onAppear { scrollViewGlobalFrame = proxy.frame(in: .global) }
+                    .onDisappear {
+                        stopAutoScroll()
+                        if viewerPresentation == nil { scrollViewGlobalFrame = .zero }
+                    }
+                    TimelineFastScroller(scrollView: underlyingScrollView)
+                        .frame(width: 44)
+                        .frame(maxHeight: .infinity)
                 }
-                .onPreferenceChange(TileFramePreferenceKey.self) { frames in
-                    tileFrames = frames
-                }
-                .onPreferenceChange(ScrollFramePreferenceKey.self) { frame in
-                    scrollViewGlobalFrame = frame
-                }
-                .onDisappear { stopAutoScroll() }
             }
         }
     }
@@ -754,6 +732,14 @@ public struct TimelineView: View {
                             )
                         }
                     )
+                    .environment(
+                        \.loadsCloudThumbnail,
+                        (tileFrames[item.id] ?? .zero).intersects(scrollViewGlobalFrame.insetBy(dx: 0, dy: -tileSize * 2))
+                    )
+                    .environment(
+                        \.cloudThumbnailPriority,
+                        (tileFrames[item.id] ?? .zero).intersects(scrollViewGlobalFrame) ? 2 : 1
+                    )
                 }
             }
         }
@@ -775,14 +761,18 @@ public struct TimelineView: View {
         }
     }
 
+    private static let sectionDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter
+    }()
+
     private static func sectionTitle(for section: GallerySection) -> String {
         var components = DateComponents()
         components.year = section.year
         components.month = section.month
         let date = Calendar.iso8601.date(from: components) ?? Date()
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM yyyy"
-        return formatter.string(from: date).capitalized
+        return sectionDateFormatter.string(from: date).capitalized
     }
 
     private func gridColumns(count: Int, spacing: CGFloat) -> [GridItem] {
@@ -793,20 +783,20 @@ public struct TimelineView: View {
     /// dense : l'en-tête de date « se range » à mesure que la grille se densifie.
     private var sectionTitleFont: Font {
         switch columnCount {
-        case ...1: return .title.weight(.bold)
-        case 2 ... 3: return .title3.weight(.semibold)
-        case 4 ... 5: return .subheadline.weight(.semibold)
-        default: return .caption.weight(.bold)
+        case ...1: .title.weight(.bold)
+        case 2 ... 3: .title3.weight(.semibold)
+        case 4 ... 5: .subheadline.weight(.semibold)
+        default: .caption.weight(.bold)
         }
     }
 
     /// Espacement vertical entre sections — se resserre quand la grille se densifie.
     private var sectionSpacing: CGFloat {
         switch columnCount {
-        case ...1: return 28
-        case 2 ... 3: return 20
-        case 4 ... 5: return 14
-        default: return 8
+        case ...1: 28
+        case 2 ... 3: 20
+        case 4 ... 5: 14
+        default: 8
         }
     }
 
@@ -821,8 +811,7 @@ public struct TimelineView: View {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
-    @ViewBuilder
-    private var albumPickerContent: some View {
+    @ViewBuilder private var albumPickerContent: some View {
         AlbumPickerSheet(
             albums: selectedAlbums,
             onSelect: { album in
@@ -962,7 +951,7 @@ public struct TimelineView: View {
     /// long-press confirme (doigt resté stable assez longtemps), la phase drag se
     /// met en place et notre handler hit-teste la tile sous le doigt pour l'utiliser
     /// comme anchor — puis chaque mouvement étend ou rétracte la plage.
-    private func dragSelectMasterGesture(scrollProxy: ScrollViewProxy) -> some Gesture {
+    private func dragSelectionGesture(scrollProxy: ScrollViewProxy) -> some Gesture {
         LongPressGesture(minimumDuration: 0.5, maximumDistance: 30)
             .sequenced(before: DragGesture(minimumDistance: 0, coordinateSpace: .global))
             .onChanged { value in
@@ -1163,32 +1152,6 @@ public struct TimelineView: View {
     }
 }
 
-// MARK: - CircularSyncIndicator
-
-/// Anneau de progression circulaire pour la toolbar. Trace un rail gris léger
-/// + un arc accent qui se remplit avec la progression. Reste minuscule (18pt)
-/// pour ne pas perturber la toolbar.
-private struct CircularSyncIndicator: View {
-    let progress: Double
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.secondary.opacity(0.25), lineWidth: 2)
-            Circle()
-                // Min 0.05 pour garder un repère visuel dès le début de la sync.
-                .trim(from: 0, to: max(0.05, progress))
-                .stroke(
-                    Color.accentColor,
-                    style: StrokeStyle(lineWidth: 2, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-                .animation(.easeOut(duration: 0.3), value: progress)
-        }
-        .frame(width: 18, height: 18)
-    }
-}
-
 // MARK: - SyncToastView
 
 /// Toast in-app moderne style iOS 17 — pilule ultraThinMaterial, icône
@@ -1230,15 +1193,15 @@ private struct SyncToastView: View {
 
     private var iconName: String {
         switch toast.kind {
-        case .success: return "checkmark.circle.fill"
-        case .error: return "exclamationmark.triangle.fill"
+        case .success: "checkmark.circle.fill"
+        case .error: "exclamationmark.triangle.fill"
         }
     }
 
     private var iconColor: Color {
         switch toast.kind {
-        case .success: return .green
-        case .error: return .orange
+        case .success: .green
+        case .error: .orange
         }
     }
 }
@@ -1266,9 +1229,9 @@ struct GalleryTile: View {
     private var isDeletingState: Bool {
         switch item.syncState {
         case .deletionPending, .deleting, .deletionFailed:
-            return true
+            true
         default:
-            return false
+            false
         }
     }
 
@@ -1350,12 +1313,11 @@ struct GalleryTile: View {
         return "local-\(item.id)"
     }
 
-    @ViewBuilder
-    private var thumbnail: some View {
+    @ViewBuilder private var thumbnail: some View {
         if let localId = item.localAssetIdentifier {
             LocalThumbnail(localIdentifier: localId, size: size)
         } else if let driveId = item.cloudDriveId, let fileId = item.cloudFileId {
-            CloudThumbnail(driveId: driveId, fileId: fileId, size: size)
+            CloudThumbnail(driveId: driveId, fileId: fileId, size: size, pack: item.thumbnailPack, revision: item.remoteRevision)
         }
     }
 }
@@ -1414,17 +1376,42 @@ struct ThumbnailPlaceholder: View {
 
 // MARK: - CloudThumbnail
 
+private struct CloudThumbnailPriorityKey: EnvironmentKey {
+    static let defaultValue = 2
+}
+
+private struct LoadsCloudThumbnailKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+private extension EnvironmentValues {
+    var cloudThumbnailPriority: Int {
+        get { self[CloudThumbnailPriorityKey.self] }
+        set { self[CloudThumbnailPriorityKey.self] = newValue }
+    }
+
+    var loadsCloudThumbnail: Bool {
+        get { self[LoadsCloudThumbnailKey.self] }
+        set { self[LoadsCloudThumbnailKey.self] = newValue }
+    }
+}
+
 struct CloudThumbnail: View {
+    @Environment(\.loadsCloudThumbnail) private var shouldLoad
+    @Environment(\.cloudThumbnailPriority) private var priority
     let driveId: Int
     let fileId: String
     let size: CGFloat
+    let pack: ThumbnailPackReference?
+    let revision: String
     @StateObject private var loader: ThumbnailLoader
 
-    init(driveId: Int, fileId: String, size: CGFloat) {
+    init(driveId: Int, fileId: String, size: CGFloat, pack: ThumbnailPackReference? = nil, revision: String = "") {
         self.driveId = driveId
         self.fileId = fileId
         self.size = size
-        _loader = StateObject(wrappedValue: ThumbnailLoader(driveId: driveId, fileId: fileId))
+        self.pack = pack; self.revision = revision
+        _loader = StateObject(wrappedValue: ThumbnailLoader(driveId: driveId, fileId: fileId, pack: pack, revision: revision))
     }
 
     var body: some View {
@@ -1439,7 +1426,11 @@ struct CloudThumbnail: View {
                 ThumbnailPlaceholder(size: size)
             }
         }
-        .task { await loader.load() }
+        .task(id: "\(shouldLoad)-\(priority)-\(revision)-\(pack?.sha256 ?? "")") {
+            loader.configure(pack: pack, revision: revision)
+            if shouldLoad { await loader.load(priority: priority) } else { loader.releaseImage() }
+        }
+        .onDisappear { loader.releaseImage() }
     }
 }
 

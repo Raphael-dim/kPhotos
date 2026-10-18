@@ -60,6 +60,8 @@ public struct GalleryItem: Identifiable, Equatable, Sendable {
     public let cloudFileId: String?
     public let cloudDriveId: Int?
     public let syncState: GalleryItemSyncState
+    public var thumbnailPack: ThumbnailPackReference?
+    public var remoteRevision: String = ""
 
     public init(
         id: String,
@@ -94,7 +96,7 @@ public struct GalleryItem: Identifiable, Equatable, Sendable {
     /// `syncState` à `.synced` pour ne pas afficher de badge (toutes les photos
     /// d'un album sont par définition déjà sur kDrive).
     public static func fromCloud(_ photo: PhotoSnapshot) -> GalleryItem {
-        GalleryItem(
+        var item = GalleryItem(
             id: photo.fileId,
             takenAt: photo.takenAt,
             isVideo: photo.isVideo,
@@ -103,6 +105,8 @@ public struct GalleryItem: Identifiable, Equatable, Sendable {
             cloudDriveId: photo.driveId,
             syncState: .synced
         )
+        item.thumbnailPack = photo.thumbnailPack; item.remoteRevision = photo.remoteRevision
+        return item
     }
 }
 
@@ -116,22 +120,22 @@ public enum ViewerMedia: Identifiable, Equatable, Sendable {
 
     public var id: String {
         switch self {
-        case .cloud(let snapshot): return "cloud-\(snapshot.fileId)"
-        case .local(let asset): return "local-\(asset.localIdentifier)"
+        case .cloud(let snapshot): "cloud-\(snapshot.fileId)"
+        case .local(let asset): "local-\(asset.localIdentifier)"
         }
     }
 
     public var takenAt: Date {
         switch self {
-        case .cloud(let snapshot): return snapshot.takenAt
-        case .local(let asset): return asset.takenAt
+        case .cloud(let snapshot): snapshot.takenAt
+        case .local(let asset): asset.takenAt
         }
     }
 
     public var isVideo: Bool {
         switch self {
-        case .cloud(let snapshot): return snapshot.isVideo
-        case .local(let asset): return asset.isVideo
+        case .cloud(let snapshot): snapshot.isVideo
+        case .local(let asset): asset.isVideo
         }
     }
 

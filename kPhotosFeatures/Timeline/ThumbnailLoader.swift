@@ -16,7 +16,9 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import CryptoKit
 import Foundation
+import ImageIO
 import kPhotosCore
 import UIKit
 
@@ -25,12 +27,18 @@ final class ThumbnailLoader: ObservableObject {
     @Published private(set) var image: UIImage?
     @Published private(set) var isLoading = false
 
+    private static var failedUntil: [String: Date] = [:]
     private let driveId: Int
     private let fileId: String
 
+    private var pack: ThumbnailPackReference?
+    private var revision: String
+    @InjectService private var packs: ThumbnailPackFetching
     @InjectService private var api: PhotoApiFetching
+    @InjectService private var thumbnails: CloudThumbnailFetching
 
-    init(driveId: Int, fileId: String) {
+    init(driveId: Int, fileId: String, pack: ThumbnailPackReference? = nil, revision: String = "") {
+        self.pack = pack; self.revision = revision
         self.driveId = driveId
         self.fileId = fileId
     }
@@ -41,61 +49,163 @@ final class ThumbnailLoader: ObservableObject {
     ///
     /// Fallback preview : certains fichiers n'ont pas (ou pas encore) de thumbnail
     /// généré côté kDrive — l'endpoint dédié renvoie alors une erreur ou un corps
-    /// non-image. Le endpoint preview, lui, répond toujours. Sans ce fallback la
+    /// non-image. Le preview peut également être indisponible. Sans ce fallback la
     /// tuile restait blanche à vie (`UIImage(data:)` nil silencieux).
-    func load() async {
-        if image != nil || isLoading { return }
-        let cacheKey = "\(driveId)-\(fileId)"
+    func configure(pack: ThumbnailPackReference?, revision: String) {
+        if self.revision != revision { image = nil }
+        self.pack = pack; self.revision = revision
+    }
+
+    static func cacheKey(driveId: Int, fileId: String, revision: String) -> String {
+        let legacy = "\(driveId)-\(fileId)"
+        return revision.isEmpty ? legacy : legacy + "-" + SHA256.hash(data: Data(revision.utf8))
+            .map { String(format: "%02x", $0) }.joined()
+    }
+
+    static func mapImage(for photo: PhotoSnapshot) async -> UIImage? {
+        let loader = ThumbnailLoader(
+            driveId: photo.driveId,
+            fileId: photo.fileId,
+            pack: photo.thumbnailPack,
+            revision: photo.remoteRevision
+        )
+        await loader.load()
+        return loader.image
+    }
+
+    func releaseImage() { image = nil }
+
+    func load(priority: Int = 2) async {
+        // SwiftUI may restart a cell task before the previous canceled task has
+        // unwound. Wait for its cleanup rather than permanently skipping the reload.
+        while isLoading {
+            do { try await Task.sleep(nanoseconds: 25_000_000) } catch { return }
+        }
+        if image != nil || Task.isCancelled { return }
+        let cacheKey = Self.cacheKey(driveId: driveId, fileId: fileId, revision: revision)
 
         if let cached = ThumbnailCache.shared.image(forKey: cacheKey) {
             image = cached
             return
         }
 
-        if let disk = ThumbnailCache.shared.diskImage(forKey: cacheKey) {
-            ThumbnailCache.shared.store(disk, forKey: cacheKey)
-            image = disk
-            return
-        }
-
         isLoading = true
         defer { isLoading = false }
-
-        // 1. Thumbnail dédié — rapide et léger.
-        if let data = try? await api.thumbnailData(driveId: driveId, fileId: fileId),
-           let uiImage = UIImage(data: data) {
-            ThumbnailCache.shared.store(uiImage, forKey: cacheKey)
-            ThumbnailCache.shared.storeOnDisk(data, forKey: cacheKey)
-            image = uiImage
+        if let disk = await ThumbnailCache.shared.diskImageAsync(forKey: cacheKey) {
+            ThumbnailCache.shared.store(disk, forKey: cacheKey)
+            if !Task.isCancelled { image = disk }
             return
         }
 
-        // 2. Fallback : preview redimensionné. Plus lourd mais toujours disponible.
-        if let data = try? await api.previewData(
-            driveId: driveId, fileId: fileId,
-            width: 400, height: 400, quality: 80
-        ), let uiImage = UIImage(data: data) {
-            ThumbnailCache.shared.store(uiImage, forKey: cacheKey)
-            ThumbnailCache.shared.storeOnDisk(data, forKey: cacheKey)
-            image = uiImage
+        if let until = Self.failedUntil[cacheKey], until > Date() { return }
+        // Scrolling past an uncached tile must not consume a scarce API request.
+        do { try await Task.sleep(nanoseconds: 180_000_000) } catch { return }
+        guard !Task.isCancelled else { return }
+
+        if let pack {
+            do {
+                if let bytes = try await packs.imageData(driveId: driveId, reference: pack, fileId: fileId, revision: revision),
+                   let decoded = await ThumbnailImageDecoder.decode(bytes) {
+                    ThumbnailCache.shared.store(decoded, forKey: cacheKey)
+                    if !Task.isCancelled { image = decoded }
+                    return
+                }
+            } catch {
+                if Task.isCancelled { return }
+                // A missing/corrupt derivative cache must not prevent the ordinary server thumbnail fallback.
+            }
         }
+
+        // Reuse a previously opened original when the server has no generated preview.
+        var savedPreview = PreviewCache.shared.image(forKey: cacheKey)
+        if savedPreview == nil { savedPreview = await PreviewCache.shared.diskImageAsync(forKey: cacheKey) }
+        guard !Task.isCancelled else { return }
+        if let preview = savedPreview {
+            await cache(preview, key: cacheKey)
+            return
+        }
+        do {
+            do {
+                let data = try await thumbnails.data(driveId: driveId, fileId: fileId, revision: revision, priority: priority)
+                guard let decoded = await ThumbnailImageDecoder.decode(data) else { throw PhotoAPIError.invalidResponse }
+                await cache(decoded, key: cacheKey)
+                return
+            } catch {
+                guard Self.canTryOriginal(after: error), !Task.isCancelled else { throw error }
+            }
+            do {
+                let data = try await api.previewData(driveId: driveId, fileId: fileId, width: 400, height: 400, quality: 80)
+                guard let decoded = await ThumbnailImageDecoder.decode(data) else { throw PhotoAPIError.invalidResponse }
+                await cache(decoded, key: cacheKey)
+                return
+            } catch {
+                guard Self.canTryOriginal(after: error), !Task.isCancelled else { throw error }
+            }
+            // Never download a large video or RAW just to draw a gallery tile.
+            let info = try await api.fileInfo(driveId: driveId, fileId: fileId)
+            let isImageName = ["heic", "heif", "jpg", "jpeg", "png", "webp", "tif", "tiff"]
+                .contains((info.name as NSString).pathExtension.lowercased())
+            guard info.mimeType.hasPrefix("image/") ||
+                ((info.mimeType.isEmpty || info.mimeType == "application/octet-stream") && isImageName),
+                info.size > 0, info.size <= 20_000_000 else {
+                throw PhotoAPIError.invalidResponse
+            }
+            let url = try await api.downloadFile(driveId: driveId, fileId: fileId)
+            defer { try? FileManager.default.removeItem(at: url) } // Owned temporary download only.
+            let decoded = await Task.detached(priority: .userInitiated) {
+                guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+                      let cg = ThumbnailImageDecoder.image(source: source) else { return UIImage?.none }
+                return UIImage(cgImage: cg)
+            }.value
+            guard let decoded else { throw PhotoAPIError.invalidResponse }
+            await cache(decoded, key: cacheKey)
+        } catch {
+            // The neutral placeholder remains retryable. Do not hammer missing/unsupported previews.
+            if Self.canTryOriginal(after: error), !Task.isCancelled {
+                Self.failedUntil[cacheKey] = Date().addingTimeInterval(60)
+            }
+        }
+        if Self.failedUntil.count > 1000 { Self.failedUntil = Self.failedUntil.filter { $0.value > Date() } }
+    }
+
+    static func canTryOriginal(after error: Error) -> Bool {
+        switch error {
+        case PhotoAPIError.notFound, PhotoAPIError.invalidResponse: true
+        case PhotoAPIError.server(let code, _): [400, 415, 422].contains(code)
+        default: false
+        }
+    }
+
+    private func cache(_ decoded: UIImage, key: String) async {
+        let compressed = await Task.detached(priority: .utility) { () -> (UIImage, Data?) in
+            if let cg = decoded.cgImage, max(cg.width, cg.height) <= 400 {
+                return (decoded, decoded.jpegData(compressionQuality: 0.75))
+            }
+            let data = decoded.jpegData(compressionQuality: 0.85)
+            let small = data.flatMap { ThumbnailImageDecoder.decodeSynchronously($0) } ?? decoded
+            return (small, small.jpegData(compressionQuality: 0.75))
+        }.value
+        ThumbnailCache.shared.store(compressed.0, forKey: key)
+        if let data = compressed.1 { ThumbnailCache.shared.storeOnDisk(data, forKey: key) }
+        Self.failedUntil[key] = nil
+        if !Task.isCancelled { image = compressed.0 }
     }
 }
 
 /// Cache deux niveaux : RAM (NSCache, eviction OS) + disque (Caches/, plafonné à
-/// ~100 MB). Le disque ne purge pas lui-même — on s'appuie sur le fait qu'iOS
-/// vide `Caches/` sous pression de stockage.
+/// 512 MiB maximum). Disk decoding, writes and periodic eviction run off the UI thread.
 final class ThumbnailCache {
     static let shared = ThumbnailCache()
     private let memory = NSCache<NSString, UIImage>()
     private let diskDirectory: URL?
 
-    private init() {
-        memory.countLimit = 600
+    init(directory: URL? = nil) {
+        memory.countLimit = 1000
+        memory.totalCostLimit = 96 * 1024 * 1024
 
         let fm = FileManager.default
-        if let caches = fm.urls(for: .cachesDirectory, in: .userDomainMask).first {
-            let dir = caches.appendingPathComponent("kPhotosThumbnails", isDirectory: true)
+        if let caches = directory ?? fm.urls(for: .cachesDirectory, in: .userDomainMask).first {
+            let dir = directory ?? caches.appendingPathComponent("kPhotosThumbnails", isDirectory: true)
             if !fm.fileExists(atPath: dir.path) {
                 try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
             }
@@ -110,19 +220,28 @@ final class ThumbnailCache {
     }
 
     func store(_ image: UIImage, forKey key: String) {
-        memory.setObject(image, forKey: key as NSString)
+        memory.setObject(
+            image,
+            forKey: key as NSString,
+            cost: Int(image.size.width * image.size.height * image.scale * image.scale * 4)
+        )
     }
 
     func diskImage(forKey key: String) -> UIImage? {
         guard let url = diskURL(for: key),
               let data = try? Data(contentsOf: url),
-              let image = UIImage(data: data) else { return nil }
+              let image = ThumbnailImageDecoder.decodeSynchronously(data) else { return nil }
+        ImageDiskBudget.touch(url)
         return image
+    }
+
+    func diskImageAsync(forKey key: String) async -> UIImage? {
+        await Task.detached(priority: .userInitiated) { self.diskImage(forKey: key) }.value
     }
 
     func storeOnDisk(_ data: Data, forKey key: String) {
         guard let url = diskURL(for: key) else { return }
-        try? data.write(to: url, options: .atomic)
+        ImageDiskBudget.store(data, at: url, limit: 512 * 1024 * 1024)
     }
 
     func diskData(forKey key: String) -> Data? {
@@ -140,7 +259,7 @@ final class ThumbnailCache {
 
 /// Cache dédié aux previews HD du viewer plein écran. Strictement séparé du
 /// `ThumbnailCache` car chaque entrée pèse ~25 MB décodée — on garde une fenêtre
-/// petite (40 items max en RAM, NSCache pour eviction OS) et un dossier disque
+/// petite (12 items max en RAM, NSCache pour eviction OS) et un dossier disque
 /// dédié pour éviter de réinterroger l'API au re-tap.
 final class PreviewCache {
     static let shared = PreviewCache()
@@ -148,7 +267,8 @@ final class PreviewCache {
     private let diskDirectory: URL?
 
     private init() {
-        memory.countLimit = 40
+        memory.countLimit = 12
+        memory.totalCostLimit = 96 * 1024 * 1024
 
         let fm = FileManager.default
         if let caches = fm.urls(for: .cachesDirectory, in: .userDomainMask).first {
@@ -167,7 +287,11 @@ final class PreviewCache {
     }
 
     func store(_ image: UIImage, forKey key: String) {
-        memory.setObject(image, forKey: key as NSString)
+        memory.setObject(
+            image,
+            forKey: key as NSString,
+            cost: Int(image.size.width * image.size.height * image.scale * image.scale * 4)
+        )
     }
 
     func diskImage(forKey key: String) -> UIImage? {
@@ -177,9 +301,13 @@ final class PreviewCache {
         return image
     }
 
+    func diskImageAsync(forKey key: String) async -> UIImage? {
+        await Task.detached(priority: .userInitiated) { self.diskImage(forKey: key) }.value
+    }
+
     func storeOnDisk(_ data: Data, forKey key: String) {
         guard let url = diskURL(for: key) else { return }
-        try? data.write(to: url, options: .atomic)
+        ImageDiskBudget.store(data, at: url, limit: 256 * 1024 * 1024)
     }
 
     func diskData(forKey key: String) -> Data? {
@@ -193,3 +321,26 @@ final class PreviewCache {
         return dir.appendingPathComponent("\(safe).jpg")
     }
 }
+
+enum ThumbnailImageDecoder {
+    static func image(source: CGImageSource) -> CGImage? {
+        CGImageSourceCreateThumbnailAtIndex(source, 0, [
+            kCGImageSourceThumbnailMaxPixelSize: 400,
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true
+        ] as CFDictionary)
+    }
+
+    static func decodeSynchronously(_ data: Data) -> UIImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
+              let cg = image(source: source) else { return nil }
+        return UIImage(cgImage: cg)
+    }
+
+    static func decode(_ data: Data) async -> UIImage? {
+        await Task.detached(priority: .userInitiated) { decodeSynchronously(data) }.value
+    }
+}
+
+/// Only app-owned disposable cache files enter this queue. Never enumerate or remove originals.

@@ -154,6 +154,12 @@ public enum FactoryService {
     }
 
     private static func registerSync() {
+        store.store(factory: Factory(type: CloudThumbnailFetching.self) { _, _ in
+            ThumbnailRequestBroker(api: resolve())
+        })
+        store.store(factory: Factory(type: ThumbnailPackFetching.self) { _, _ in
+            ThumbnailPackStore(api: resolve())
+        })
         store.store(factory: Factory(type: PreparedMediaIndexSyncing.self) { _, _ in
             PreparedMediaIndexSync(api: resolve(), writer: resolve(), reader: resolve(), drives: resolve())
         })

@@ -164,5 +164,19 @@ final class MediaLibraryIndexTests: XCTestCase {
         ))
     }
 
+    func testThumbnailPackReadIsRevisionSpecificAndCannotOverwriteExistingFile() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let bytes = Data([1, 2, 3])
+        try ThumbnailPack.create(at: url, images: [("id", "rev", bytes)])
+        XCTAssertEqual(try ThumbnailPack.imageData(at: url, fileId: "id", revision: "rev"), bytes)
+        XCTAssertNil(try ThumbnailPack.imageData(at: url, fileId: "id", revision: "new"))
+        let original = try Data(contentsOf: url)
+        XCTAssertThrowsError(try ThumbnailPack.create(at: url, images: [("id", "new", Data([4]))]))
+        XCTAssertEqual(try Data(contentsOf: url), original)
+        try Data("corrupt".utf8).write(to: url)
+        XCTAssertThrowsError(try ThumbnailPack.imageData(at: url, fileId: "id", revision: "rev"))
+    }
+
     private func holdRealm(_ configuration: Realm.Configuration) throws -> Realm { try Realm(configuration: configuration) }
 }

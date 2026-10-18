@@ -1307,7 +1307,7 @@ private final class MediaPageLoader: ObservableObject {
     /// `ProgressView` au premier ouvrage.
     private func prefillFromCache() {
         guard case .cloud(let photo) = media, !photo.isVideo else { return }
-        let key = "\(photo.driveId)-\(photo.fileId)"
+        let key = ThumbnailLoader.cacheKey(driveId: photo.driveId, fileId: photo.fileId, revision: photo.remoteRevision)
         if let cached = ThumbnailCache.shared.image(forKey: key)
             ?? ThumbnailCache.shared.diskImage(forKey: key) {
             image = cached
@@ -1337,7 +1337,7 @@ private final class MediaPageLoader: ObservableObject {
         }
 
         if didLoadPreview { return }
-        let key = "\(photo.driveId)-\(photo.fileId)"
+        let key = ThumbnailLoader.cacheKey(driveId: photo.driveId, fileId: photo.fileId, revision: photo.remoteRevision)
 
         if let disk = PreviewCache.shared.diskImage(forKey: key) {
             PreviewCache.shared.store(disk, forKey: key)

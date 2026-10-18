@@ -168,7 +168,6 @@ final class PhotoAnnotationView: MKAnnotationView {
     private static let size: CGFloat = 52
 
     private let imageView = UIImageView()
-    private let placeholderLayer = CALayer()
 
     override init(annotation: MKAnnotation?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
@@ -209,7 +208,7 @@ final class PhotoAnnotationView: MKAnnotationView {
     }
 
     private func loadThumbnail(for photo: PhotoSnapshot) {
-        let key = "\(photo.driveId)-\(photo.fileId)"
+        let key = ThumbnailLoader.cacheKey(driveId: photo.driveId, fileId: photo.fileId, revision: photo.remoteRevision)
         if let cached = ThumbnailCache.shared.image(forKey: key) {
             imageView.image = cached
             return
@@ -217,7 +216,7 @@ final class PhotoAnnotationView: MKAnnotationView {
         // Lecture disque hors main pour ne pas bloquer le scroll de la carte.
         imageView.image = nil
         Task.detached(priority: .userInitiated) { [weak self] in
-            let disk = ThumbnailCache.shared.diskImage(forKey: key)
+            let disk = await ThumbnailLoader.mapImage(for: photo)
             if let disk {
                 ThumbnailCache.shared.store(disk, forKey: key)
                 await MainActor.run { [weak self] in
@@ -276,8 +275,10 @@ final class PhotoClusterAnnotationView: MKAnnotationView {
         // Badge en haut à droite, débordant légèrement de la vignette.
         let badgeSize: CGFloat = 24
         countBadge.frame = CGRect(
-            x: Self.size - badgeSize + 4, y: -4,
-            width: badgeSize, height: badgeSize
+            x: Self.size - badgeSize + 4,
+            y: -4,
+            width: badgeSize,
+            height: badgeSize
         )
         countBadge.textAlignment = .center
         countBadge.font = .systemFont(ofSize: 11, weight: .bold)
@@ -306,13 +307,13 @@ final class PhotoClusterAnnotationView: MKAnnotationView {
             imageView.image = nil
             return
         }
-        let key = "\(photo.driveId)-\(photo.fileId)"
+        let key = ThumbnailLoader.cacheKey(driveId: photo.driveId, fileId: photo.fileId, revision: photo.remoteRevision)
         if let cached = ThumbnailCache.shared.image(forKey: key) {
             imageView.image = cached
         } else {
             imageView.image = nil
             Task.detached(priority: .userInitiated) { [weak self] in
-                let disk = ThumbnailCache.shared.diskImage(forKey: key)
+                let disk = await ThumbnailLoader.mapImage(for: photo)
                 if let disk {
                     ThumbnailCache.shared.store(disk, forKey: key)
                     await MainActor.run { [weak self] in

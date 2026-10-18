@@ -49,7 +49,7 @@ public final class LocalThumbnailLoader: ObservableObject {
 
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
-        options.isNetworkAccessAllowed = false // iCloud Photo Library : on garde local-only.
+        options.isNetworkAccessAllowed = true // iCloud Photo Library : on garde local-only.
         options.resizeMode = .fast
 
         requestID = LocalThumbnailCacheController.sharedManager.requestImage(
@@ -91,7 +91,7 @@ public enum LocalThumbnailCacheController {
 
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
-        options.isNetworkAccessAllowed = false
+        options.isNetworkAccessAllowed = true
         options.resizeMode = .fast
 
         sharedManager.startCachingImages(
@@ -111,7 +111,7 @@ public enum LocalThumbnailCacheController {
 
         let options = PHImageRequestOptions()
         options.deliveryMode = .opportunistic
-        options.isNetworkAccessAllowed = false
+        options.isNetworkAccessAllowed = true
         options.resizeMode = .fast
 
         sharedManager.stopCachingImages(
