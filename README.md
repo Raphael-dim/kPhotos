@@ -1,104 +1,56 @@
 # kPhotos
 
-An open source iOS client that backs up your photo library to **kDrive** (Infomaniak's cloud storage), and presents it as a date-sorted timeline.
+Independent open source iOS client for [kDrive](https://www.infomaniak.com/kdrive), licensed under [GPL-3.0](LICENSE).
+Not affiliated with or endorsed by Infomaniak. See [NOTICE](NOTICE).
 
-[![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](LICENSE)
-[![Swift 5.10](https://img.shields.io/badge/swift-5.10-orange.svg)](https://swift.org)
-[![Platform iOS 16.6+](https://img.shields.io/badge/iOS-16.6%2B-lightgrey.svg)](#requirements)
-[![Status alpha](https://img.shields.io/badge/status-alpha-red.svg)](#status)
+## Status and features
 
-> ⚠️ This is an independent, community project. It is **not** an official Infomaniak product and is not affiliated with Infomaniak Network SA. It uses the public kDrive HTTP API. See [NOTICE](NOTICE).
+Alpha, under active development. Expect breaking changes; keep an independent copy of your originals.
 
----
+- Browse local photos and an existing kDrive folder in a timeline ordered by capture date.
+- Back up PhotoKit photos, videos and companion resources, with byte verification.
+- Browse albums backed by kDrive categories, view fullscreen media and display available GPS locations.
+- Prepare original-media metadata on Wi-Fi and cache it for subsequent visits.
+- Group cloud Live Photos only when embedded Apple identifiers establish an unambiguous pair.
 
-## What it does
+Capture dates come from PhotoKit or embedded original metadata. Cloud file dates are explicitly approximate fallbacks.
+Background work depends on the time granted by iOS; continuous background sync is not guaranteed.
+There is no kPhotos server or analytics service.
 
-- Authenticates against your kDrive using a Personal Access Token (PAT).
-- Uploads photos and videos from your iOS photo library to a dedicated folder in your kDrive.
-- Displays the result as a timeline ordered by **capture date** (`PHAsset.creationDate`), not by upload date.
-- Groups items into albums backed by kDrive categories.
-- Runs incremental syncs in the background when iOS allows.
+## Build
 
-The app keeps all media in **your** kDrive — kPhotos has no server, no analytics endpoint, no third-party storage.
+Requires macOS, Xcode with the SDK used by the source (currently Xcode 27), and [Mise](https://mise.jdx.dev/).
+The deployment target remains iOS 16.6; newer APIs have availability fallbacks.
 
-## Status
-
-Alpha. Internal use only. Not distributed via TestFlight or the App Store.
-Expect breaking changes between commits while the project stabilizes.
-
-## Requirements
-
-- macOS 14+ with Xcode 26+
-- iOS 16.6+ for the deployment target
-- [Mise](https://mise.jdx.dev/) to install pinned tool versions
-- A kDrive account with a Personal Access Token (scope `drive`)
-
-## Quick start
-
-```bash
-# 1. Install pinned tools (tuist, swiftlint, swiftformat, periphery)
+```sh
 make setup
-
-# 2. Resolve SPM dependencies and generate the Xcode project
 make generate
-
-# 3. Open in Xcode
-make open
+make run-sim                 # defaults to iPhone 17
+# or: make open
 ```
 
-Build and run on simulator from Xcode, or:
+For a physical device, set `TUIST_KPHOTOS_DEVELOPMENT_TEAM` locally in the ignored `.mise.local.toml`, then regenerate.
+Simulator builds also need ad-hoc signing for Keychain access. The app identifier is `app.kphotos`.
+Changing a bundle identifier does not migrate its container or Keychain.
 
-```bash
-make build           # build only
-make run-sim         # build + install + launch on the default simulator
-```
+## Connect a library
 
-### Signing
+Create a Personal Access Token in [Infomaniak Manager](https://manager.infomaniak.com/v3/profile/api-token)
+with the `drive` scope, then enter it in the app. The token is stored in the iOS Keychain.
+OAuth code exists but is inactive and ships without a client identifier.
 
-The project reads the Apple Developer Team ID from the environment so the
-repository contains no signing identity:
+Select an existing destination folder in Settings. Browsing does not create folders or start uploads.
+Gallery indexing reads image/video listings; metadata comes from originals, never Google sidecars or ZIP archives.
+An optional app-owned `.kphotos-index` cache on kDrive contains derived metadata, including capture dates and GPS when available.
 
-```bash
-export KPHOTOS_DEVELOPMENT_TEAM=YOUR_TEAM_ID
-make generate
-```
+## Documentation
 
-For simulator-only work, leave it unset.
-
-## Architecture
-
-```
-kPhotos/             Main app target — SwiftUI App, lifecycle, root navigation
-kPhotosCore/         Business logic — Realm models, kDrive API, sync engine.
-                     No SwiftUI / UIKit imports.
-kPhotosCoreUI/       Reusable SwiftUI components (no business logic).
-kPhotosFeatures/     Feature modules — Timeline, Albums, Settings, Map, Auth.
-                     ViewModels live here.
-kPhotosResources/    Assets and localizable strings.
-kPhotosTests/        Unit tests (mirror the source layout).
-Tuist/               Project definition (Package.swift, helpers).
-docs/                kDrive OpenAPI reference and design notes.
-scripts/             Empirical API probes (require a PAT).
-```
-
-Detailed conventions live in [AGENTS.md](AGENTS.md).
-
-## Authentication
-
-kPhotos currently authenticates with a Personal Access Token created from
-[Infomaniak Manager](https://manager.infomaniak.com/v3/profile/api). Use the
-generic `drive` scope.
-
-The token is stored in the iOS Keychain (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`).
-OAuth 2 / PKCE is wired but not enabled by default.
-
-## Contributing
-
-Contributions, bug reports, and feedback are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md).
-
-For security issues, please follow [SECURITY.md](SECURITY.md) and do **not** open a public issue.
-
-## License
-
-kPhotos is licensed under the [GNU General Public License v3.0](LICENSE).
-See [NOTICE](NOTICE) for third-party attributions and the independence disclaimer.
+- [Product goals and boundaries](docs/product-scope.md)
+- [Local agent workflow](WORKFLOW.md)
+- [Contributing and checks](CONTRIBUTING.md)
+- [Development commands](COMMANDS.md)
+- [Architecture and media safety](docs/galerie-et-live-photos.md)
+- [Infomaniak API reference](docs/api/README.md)
+- [Dependency review](docs/dependencies.md)
+- [Project rules for agents](AGENTS.md)
+- [Changelog](CHANGELOG.md) and [security reporting](SECURITY.md)

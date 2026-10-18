@@ -1,28 +1,22 @@
-# Reporting issues privately
+# Security
 
-If you believe you have found an issue that should not be discussed in a public
-GitHub issue, please report it privately using GitHub's built-in
-**"Report a vulnerability"** feature on the *Security* tab of this repository.
+kPhotos is alpha software. Only the latest revision on `main` receives fixes.
 
-Please include:
+Report vulnerabilities privately through GitHub’s **Security → Report a vulnerability** when available.
+Do not include a token, photo, database, signed URL or real-library manifest in a public issue.
+Include the affected revision, impact and reproduction using synthetic data where possible.
 
-- a clear description of the issue,
-- steps to reproduce it,
-- the affected version or commit,
-- any relevant logs or screenshots, with personal data redacted.
+For issues in dependencies that affect kPhotos, identify the affected package/version and coordinate with upstream maintainers.
+Service-side Infomaniak issues should also be reported to Infomaniak support.
+If a credential was published, revoke it at its issuer; deleting a file or rewriting Git history does not revoke it.
 
-You will receive an acknowledgement, and the report will be handled privately
-until a fix is available.
+## Before publication
 
-## Out of scope
+- Run `make check-secrets`: Gitleaks scans publishable working files, including untracked files, and all locally reachable commits.
+- Review binary assets manually; text scanners do not detect an e-mail or token embedded in a screenshot.
+- Keep signing settings in ignored `.mise.local.toml`; private experiments and diagnostics belong in ignored `.local/`.
+- Never commit app databases, account exports, original media or generated build/test results.
+- Git ignores do not remove files already tracked or data in earlier commits. Review `git diff --cached` before committing.
 
-- Vulnerabilities in third-party dependencies (Realm, Alamofire, …) — please
-  report those upstream.
-- Issues affecting the Infomaniak kDrive service itself — please contact
-  Infomaniak support directly.
-- Self-inflicted issues (e.g. pasting a token into a public space).
-
-## Supported versions
-
-kPhotos is currently in **alpha**. Only the latest commit on `main` is
-supported. There are no maintained release branches yet.
+The app stores credentials in Keychain and its local index in encrypted Realm. Derived metadata caches on kDrive
+can include dates, GPS and media identifiers and must be treated as private user data.

@@ -1,185 +1,110 @@
-# COMMANDS.md — kPhotos cheatsheet
+# Development commands
 
-All the commands you need to develop, build, test and debug kPhotos on the iOS
-simulator. Quick reference — details and overridable flags live in the
-[Makefile](Makefile).
+The [Makefile](Makefile) is the source of truth. Run commands from the repository root.
 
-> Convention: `SIMULATOR` defaults to `iPhone 17`. To target another available
-> simulator, prefix the command: `SIMULATOR="iPhone 16e" make run-sim`.
+| Purpose | Command |
+| --- | --- |
+| Install pinned tools | `make setup` |
+| Resolve packages and apply the reviewed Realm compatibility shim | `make install` |
+| Generate the workspace after adding/removing source files | `make generate` |
+| Open Xcode | `make open` |
+| Build / run simulator | `make build` / `make run-sim` |
+| Choose a simulator | `make run-sim SIMULATOR="iPhone 16e"` |
+| Run tests | `make test` |
+| Verify GPL headers, formatting and lint | `make check-headers format-check lint-ci` |
+| Apply formatting | `make format` |
+| Scan for unused code | `make dead-code` |
+| Scan publishable files for secrets | `make check-secrets` |
+| Refresh official kDrive API reference | `./scripts/update_api_doc.sh` |
+| Remove generated build files | `make clean` |
 
----
+## First launch and daily changes
 
-## 1. Daily workflow
-
-| What | Command | When |
-|---|---|---|
-| Build + boot sim + install + launch | `make run-sim` | You just changed code and want to see the result |
-| Open Xcode (then ⌘R) | `make open` | You'd rather use Xcode for debugging / breakpoints |
-| Re-generate the project | `make generate` | You **added/removed a file or a target** (Tuist scans globs at generate time, not at build) |
-| Build without launching | `make build` | You just want to check that it compiles |
-| Unit tests | `make test` | Before a commit |
-| Strict lint | `make lint` | Before a commit |
-| Auto-format | `make format` | Before a commit |
-| Clean | `make clean` | Weird symptoms, inconsistent builds |
-
-### Special case: you only **edited** an existing file
-
-No need for `make generate`. `make run-sim` (or ⌘R) is enough — Xcode
-recompiles what changed.
-
-### Special case: you **added a new `.swift` file**
-
-```bash
-make generate && make run-sim
+```sh
+make setup
+make generate
+make run-sim
 ```
 
-Without `generate`, Tuist hasn't seen the new file and it won't appear in the
-target → "cannot find type X in scope" compilation error.
+`make generate` already runs dependency installation. The first resolution downloads the packages and may take several minutes.
+After editing an existing file, use `make build`, `make run-sim` or Run in Xcode.
+After adding/removing a source file, resource or target, regenerate first: Tuist discovers files when generating the workspace.
+`SIMULATOR` defaults to `iPhone 17`; `SCHEME` defaults to `kPhotos`.
 
----
+## Targeted tests
 
-## 2. First launch / new machine
+Run a single test class:
 
-```bash
-make setup       # installs tuist, swiftlint, swiftformat, periphery via mise
-make install     # tuist install — resolves SPM packages (3–5 min, ~150 MB)
-make generate    # produces kPhotos.xcworkspace
-make run-sim     # build and launch
+```sh
+xcodebuild test -workspace kPhotos.xcworkspace -scheme kPhotos \
+  -destination 'platform=iOS Simulator,name=iPhone 17' \
+  -only-testing:kPhotosTests/TimelineManagerTests
 ```
 
-Or all at once:
+Add `/testMethodName` to the `-only-testing` value to run one method. Use an actual method name from the test class.
+Run the relevant suite again after changing production behavior; full tests remain a pre-PR check.
 
-```bash
-make setup && make generate && make run-sim
-```
+## Simulator lifecycle and diagnostics
 
----
+These commands target the currently booted simulator. Use `xcrun simctl list devices available` to identify a specific device
+when more than one is booted, then replace `booted` with its identifier.
 
-## 3. Simulator — useful commands
-
-```bash
-# List available simulators
-xcrun simctl list devices available | grep iPhone
-
-# Boot a simulator without building
+```sh
+xcrun simctl list devices available
 xcrun simctl boot "iPhone 17"
 open -a Simulator
-
-# Kill the app without restarting the simulator
 xcrun simctl terminate booted app.kphotos
-
-# Uninstall the app (useful to reset Realm + photo permissions)
-xcrun simctl uninstall booted app.kphotos
-
-# Full reset of the simulator (erases everything)
-xcrun simctl erase "iPhone 17"
-
-# Launch the already-installed app
 xcrun simctl launch booted app.kphotos
-
-# Launch with console logs attached
 xcrun simctl launch --console booted app.kphotos
 ```
 
----
+The launch command runs the already-installed build; it does not compile changes.
+For logs and container inspection:
 
-## 4. Logs and debugging
-
-```bash
-# Stream the app's logs in real time
+```sh
 xcrun simctl spawn booted log stream --predicate 'process == "kPhotos"' --style compact
-
-# Logs from the last 5 minutes
 xcrun simctl spawn booted log show --last 5m --predicate 'process == "kPhotos"' --style compact
-
-# Find the app container (useful to inspect Realm)
 xcrun simctl get_app_container booted app.kphotos data
-
-# Open the data folder in Finder
-open "$(xcrun simctl get_app_container booted app.kphotos data)/Library/Application Support"
 ```
 
----
+Logs and container contents can contain private data. Keep exports outside Git, preferably in ignored `.local/`.
+Inspect app data with the app stopped; do not edit a live Realm or copy auxiliary pipes as ordinary files.
 
-## 5. Quick reset by symptom
+## Troubleshooting without losing app data
 
-| Symptom | Reflex |
-|---|---|
-| "cannot find type" on a file you just added | `make generate` |
-| Corrupted Realm / schema mismatch | `xcrun simctl uninstall booted app.kphotos` then `make run-sim` |
-| Blocked photo permissions | Simulator Settings → kPhotos → allow, OR uninstall |
-| Inconsistent build after merge / branch switch | `make clean && make generate && make run-sim` |
-| `tuist install` fails | `rm -rf Tuist/.build && make install` |
-| Broken SPM cache | `rm -rf ~/Library/Caches/org.swift.swiftpm && make install` |
-| Xcode is stuck | `killall Xcode` ; `make open` |
+| Symptom | First action |
+| --- | --- |
+| Newly added type/resource is missing | `make generate`, then rebuild |
+| Missing workspace/dependencies | `make generate`; inspect the installation error if it fails |
+| Stale build after a merge or target change | `make clean`, then `make generate` and rebuild |
+| Photo permission is limited/denied | Check the simulator/device Photos settings for kPhotos |
+| Keychain failure on simulator | Check ad-hoc signing; do not disable signing |
+| Realm schema, corruption or decryption error | Preserve the database and diagnose migration/key access before changing anything |
+| Dependency install or Realm shim fails | Check the lockfile, installed tool versions and upstream compatibility before clearing caches |
 
----
+`make clean` removes project build/generated files; it does not reset the installed app container or its Keychain.
+Uninstalling an app or erasing a simulator destroys local test data. Reserve those actions for an explicitly disposable test environment,
+never as the default repair for a real library or an unknown Realm error.
 
-## 6. Targeted tests
+## Tuist, SPM and tool maintenance
 
-```bash
-# Full suite
-make test
-
-# A single test class
-xcodebuild test \
-  -workspace kPhotos.xcworkspace \
-  -scheme kPhotos \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
-  -only-testing:kPhotosTests/TimelineManagerTests
-
-# A single test method
-xcodebuild test \
-  -workspace kPhotos.xcworkspace \
-  -scheme kPhotos \
-  -destination 'platform=iOS Simulator,name=iPhone 17' \
-  -only-testing:kPhotosTests/TimelineManagerTests/testGroupByYearMonth_ordersSectionsByTakenAtDesc
+```sh
+mise exec -- tuist version
+mise exec -- tuist graph
 ```
 
----
+Change a package constraint in `Tuist/Package.swift` only after reviewing release notes, advisories and licensing.
+Resolve with `make install`, regenerate with `make generate`, and inspect the changes in `Tuist/Package.resolved`.
+If the existing lock satisfies the constraint, installation may retain the locked version; a deliberate upgrade needs an explicit
+constraint/update decision, not deleting the lockfile and accepting arbitrary versions.
+For Realm, inspect `scripts/prepare_realm.py` and validate migration/encryption as well as compilation.
 
-## 7. Git — conventional workflow
+For tool upgrades, edit the pinned version in `.mise.toml`, run `make setup`, and verify checks with that version.
+Do not replace pinned versions with an unreviewed blanket tool upgrade.
 
-```bash
-# Conventional Commits (cf. AGENTS.md §13)
-git commit -m "feat(timeline): show device library count"
-git commit -m "fix(realm): create application support dir before opening realm"
-git commit -m "refactor(core): extract PhotoReading / PhotoWriting protocols"
-```
+## Commit and API checks
 
-Common scopes: `app`, `core`, `coreui`, `features`, `timeline`, `albums`,
-`upload`, `sync`, `widget`, `share`, `ci`, `deps`, `agents`.
+Commit format, scopes and review requirements live in [AGENTS.md](AGENTS.md#conventional-commits) and [WORKFLOW.md](WORKFLOW.md).
+Public pull requests follow [CONTRIBUTING.md](CONTRIBUTING.md).
 
----
-
-## 8. Tuist / SPM maintenance
-
-```bash
-# View the dependency graph
-tuist graph
-
-# Force re-resolution with a new package version
-# (edit Tuist/Package.swift, then:)
-rm -rf Tuist/.build && make install && make generate
-
-# Check the effective Tuist version
-tuist version    # must match .mise.toml
-
-# Update the tools declared in .mise.toml
-mise upgrade
-```
-
----
-
-## 9. "I want to..." cheatsheet
-
-| I want to... | I do... |
-|---|---|
-| ...see the app after a Swift change | `make run-sim` |
-| ...add a new file | create the file, then `make generate && make run-sim` |
-| ...debug with breakpoints | `make open` then ⌘R in Xcode |
-| ...start from a clean state | `make clean && make generate` |
-| ...wipe Realm without rebuilding | `xcrun simctl uninstall booted app.kphotos` |
-| ...watch logs live | `xcrun simctl spawn booted log stream --predicate 'process == "kPhotos"'` |
-| ...switch simulator | `SIMULATOR="iPhone 16e" make run-sim` |
-| ...run the tests | `make test` |
+API probes in `scripts/api_test*.sh` perform real writes and cleanup; use only a disposable test folder and never publish their output.

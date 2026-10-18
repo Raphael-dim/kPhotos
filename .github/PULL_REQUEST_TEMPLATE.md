@@ -12,7 +12,7 @@
 ## Checklist
 
 - [ ] Commits follow [Conventional Commits](https://www.conventionalcommits.org/)
-- [ ] `make lint` passes
+- [ ] `make check-headers format-check lint-ci check-secrets` passes
 - [ ] `make test` passes
 - [ ] New / modified files start with the GPL-3.0 header
 - [ ] User-facing strings go through `kPhotosResources` (`L10n.*`)
