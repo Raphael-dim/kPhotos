@@ -225,6 +225,19 @@ class LibraryTestAPI: PhotoApiFetching {
         throw PhotoAPIError.invalidResponse
     }
 
+    func saveMediaIndex(
+        _ index: MediaLibraryIndex,
+        name: String,
+        previous: MediaIndexUploadState?,
+        clientToken: String
+    ) async throws -> MediaIndexUploadState {
+        throw PhotoAPIError.invalidResponse
+    }
+
+    func originalMetadata(driveId: Int, fileId: String, isVideo: Bool) async throws -> EmbeddedMediaMetadata {
+        throw PhotoAPIError.invalidResponse
+    }
+
     func thumbnailData(driveId: Int, fileId: String) async throws -> Data { Data() }
     func previewData(driveId: Int, fileId: String, width: Int?, height: Int?, quality: Int?) async throws -> Data {
         Data()

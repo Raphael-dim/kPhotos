@@ -32,13 +32,24 @@ public final class Photo: Object {
     @Persisted public var driveId: Int = 0
     @Persisted public var localIdentifier: String = ""
     @Persisted public var name: String = ""
-    @Persisted public var captureDateSource: String = ""
-    @Persisted public var remoteRevision: String = ""
-    @Persisted public var isAvailable: Bool = true
     @Persisted public var libraryRootId: String = ""
+    @Persisted public var isAvailable: Bool = true
+    @Persisted public var contentSHA256: String = ""
+    @Persisted public var remoteRevision: String = ""
+    @Persisted public var resourceRevisionsJSON: String = "{}"
+    @Persisted public var localModifiedAt: Date?
+    @Persisted public var backupComplete: Bool = false
+    @Persisted public var resourceFileIds: List<String>
 
     /// Date de prise de vue (PHAsset.creationDate). Source de vérité pour la timeline.
     @Persisted public var takenAt: Date = .init()
+    @Persisted public var captureDateSource: String = ""
+    @Persisted public var latitude: Double?
+    @Persisted public var longitude: Double?
+    @Persisted public var locationSource: String = ""
+    @Persisted public var thumbnailPackJSON: String = ""
+    @Persisted public var embeddedMetadataJSON: String = ""
+    @Persisted public var embeddedMetadataRevision: String = ""
     @Persisted public var uploadedAt: Date = .init()
 
     @Persisted public var mimeType: String = ""
@@ -66,11 +77,31 @@ public struct PhotoSnapshot: Identifiable, Equatable, Sendable {
     public let driveId: Int
     public let localIdentifier: String
     public let name: String
-    public var captureDateSource: String = ""
-    public var remoteRevision: String = ""
-    public var isAvailable: Bool = true
     public var libraryRootId: String = ""
+    public var isAvailable: Bool = true
+    public var contentSHA256: String = ""
+    public var remoteRevision: String = ""
+    public var resourceRevisions: [String: String] = [:]
+    public var localModifiedAt: Date?
+    public var backupComplete: Bool = false
+    public var resourceFileIds: [String] = []
     public let takenAt: Date
+    public var captureDateSource: String = ""
+    public var coordinate: MediaCoordinate?
+    public var locationSource: String = ""
+    public var thumbnailPack: ThumbnailPackReference?
+    public var embeddedMetadataJSON: String = ""
+    public var embeddedMetadataRevision: String = ""
+    /// Derived from the original's cached metadata, never from its filename.
+    public var liveContentIdentifier: String = ""
+    /// Transient viewer/restoration link; the motion remains a separate cloud original.
+    public var liveMotionFileId: String?
+    public var liveMotionName: String?
+    public var embeddedMetadata: EmbeddedMediaMetadata? {
+        try? JSONDecoder().decode(EmbeddedMediaMetadata.self, from: Data(embeddedMetadataJSON.utf8))
+    }
+
+    public var hasReliableCaptureDate: Bool { ["photokit", "embedded_offset"].contains(captureDateSource) }
     public let uploadedAt: Date
     public let mimeType: String
     public let size: Int64
@@ -79,8 +110,6 @@ public struct PhotoSnapshot: Identifiable, Equatable, Sendable {
     public let albumIds: [String]
     public let syncStatus: PhotoSyncStatus
     public let isFavorite: Bool
-
-    public var hasReliableCaptureDate: Bool { ["photokit", "embedded_offset"].contains(captureDateSource) }
 
     public var fileId: String { id }
 
@@ -131,10 +160,30 @@ public struct PhotoSnapshot: Identifiable, Equatable, Sendable {
             syncStatus: photo.syncStatus,
             isFavorite: photo.isFavorite
         )
+        self.captureDateSource = photo.captureDateSource
+        if let lat = photo.latitude, let lon = photo.longitude {
+            self.coordinate = MediaCoordinate(latitude: lat, longitude: lon)
+        }
+        self.locationSource = photo.locationSource
+        self.thumbnailPack = photo.thumbnailPackJSON.data(using: .utf8).flatMap { try? JSONDecoder().decode(
+            ThumbnailPackReference.self,
+            from: $0
+        )
+        }
+        self.embeddedMetadataJSON = photo.embeddedMetadataJSON
+        self.embeddedMetadataRevision = photo.embeddedMetadataRevision
+        self.liveContentIdentifier = embeddedMetadata?.livePhotoContentIdentifier ?? ""
         self.libraryRootId = photo.libraryRootId
         self.isAvailable = photo.isAvailable
+        self.contentSHA256 = photo.contentSHA256
         self.remoteRevision = photo.remoteRevision
-        self.captureDateSource = photo.captureDateSource
+        self.localModifiedAt = photo.localModifiedAt
+        self.resourceRevisions = (try? JSONDecoder().decode(
+            [String: String].self,
+            from: Data(photo.resourceRevisionsJSON.utf8)
+        )) ?? [:]
+        self.backupComplete = photo.backupComplete
+        self.resourceFileIds = Array(photo.resourceFileIds)
     }
 }
 

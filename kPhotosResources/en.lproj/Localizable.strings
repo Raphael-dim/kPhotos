@@ -186,11 +186,11 @@
 
 // Map
 "map.tab.title" = "Map";
-"map.title" = "Your photos on the map";
+"map.title" = "Map";
 "map.subtitle" = "%d geolocated photo(s)";
 "map.loading" = "Loading map…";
 "map.empty.title" = "No geolocated photos";
-"map.empty.subtitle" = "Photos taken with a location will appear here. Back up your photos from this device first so they can be placed on the map.";
+"map.empty.subtitle" = "Photos and videos containing GPS coordinates will appear here as their metadata is read.";
 "map.permission.title" = "Photo library access required";
 "map.permission.subtitle" = "kPhotos uses the GPS coordinates kept by iOS to place your photos on the map.";
 "map.permission.denied.subtitle" = "Open Settings to allow kPhotos to read your photos' location metadata.";
@@ -214,3 +214,47 @@
 "common.create" = "Create";
 
 "signIn.pat.tutorial.page" = "%d / %d";
+
+"map.metadata.progress" = "Preparing places: %d / %d";
+
+"map.metadata.failures" = "Could not read metadata for %d file(s).";
+
+"map.metadata.complete" = "Complete places";
+
+"map.metadata.help" = "A first scan of all originals may take several hours. Your gallery remains available.";
+
+"map.metadata.suspend" = "Pause";
+
+"map.metadata.limited" = "Metadata was only partially read for %d items. Missing GPS has not been confirmed.";
+
+"common.more" = "More options";
+
+"places.status.title" = "Place preparation";
+
+"places.status.checking" = "Finding places";
+
+"places.status.running" = "Preparing places";
+
+"places.status.paused" = "Preparation paused";
+
+"places.status.waiting" = "Preparation waiting";
+
+"places.status.attention" = "Places need attention";
+
+"places.status.complete" = "Places up to date";
+
+"places.status.completeDetail" = "The map is ready to explore";
+
+"places.status.help" = "kPhotos reads locations from your originals over Wi-Fi. This preparation does not modify your files and is separate from backup uploads.";
+
+"places.status.noGPS" = "A photo without a GPS location can be fully processed without appearing on the map.";
+
+"places.status.processed" = "Items processed";
+
+"places.status.resume" = "Resume preparation";
+
+"places.status.processedCount" = "%@ of %@";
+
+"places.status.progress" = "%@ of %@ items processed";
+
+"places.status.inProgress" = "Processing";

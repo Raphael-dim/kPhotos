@@ -16,11 +16,12 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import Combine
 import CoreLocation
 import Foundation
 import kPhotosCore
 
-/// Point sur la carte = une photo kDrive qui a une localisation connue (via PhotoKit).
+/// A cloud photo with a confirmed portable or PhotoKit location.
 /// On stocke lat/lon en `Double` (Sendable, contrairement à `CLLocationCoordinate2D`)
 /// et on reconstruit la `CLLocationCoordinate2D` au moment d'instancier les
 /// `MKAnnotation`.
@@ -60,9 +61,7 @@ public struct PlaceGroup: Identifiable, Equatable, Sendable {
     }
 }
 
-/// ViewModel de la page Carte. Croise les photos kDrive (Realm) avec les
-/// `PHAsset.location` correspondants — la seule source fiable de GPS car les
-/// previews server-side de kDrive sont généralement strippés de leurs EXIF.
+/// Map coordinates come from the preserved Takeout metadata or a linked local asset.
 @MainActor
 public final class PhotoMapViewModel: ObservableObject {
     public enum State: Equatable {
@@ -74,56 +73,86 @@ public final class PhotoMapViewModel: ObservableObject {
         case error(message: String)
     }
 
+    @Published public private(set) var metadataProgress = MetadataIndexProgress()
     @Published public private(set) var state: State = .loading
     /// Lieux agrégés à partir des points — utilisés pour la vue "Lieux" en liste
     /// au-dessus de la minimap. Reconstruits à chaque `load()`. Les `placeName`
     /// se remplissent asynchroniquement via `resolvePlaceNames()`.
     @Published public private(set) var placeGroups: [PlaceGroup] = []
 
+    @InjectService private var preparedIndex: PreparedMediaIndexSyncing
+    @InjectService private var metadataIndexer: EmbeddedMetadataIndexing
+    @InjectService private var driveManager: DriveManaging
     @InjectService private var photoReader: PhotoReading
     @InjectService private var assetReader: PHAssetReading
 
-    public init() {}
+    @InjectService private var settings: SyncSettingsReading
+    private var cancellables: Set<AnyCancellable> = []
+    private var geocodingTask: Task<Void, Never>?
+    private var loadGeneration = UUID()
+
+    public init() {
+        metadataIndexer.progressPublisher.receive(on: DispatchQueue.main)
+            .sink { [weak self] progress in
+                guard let self else { return }
+                // Preparation is shared, but its status must match the library shown here.
+                let drive = try? driveManager.selectedDrive()
+                let scope = drive.map { "\($0.id):\($0.rootFolderId)" }
+                self.metadataProgress = progress.libraryScope == scope ? progress : MetadataIndexProgress()
+            }.store(in: &cancellables)
+        photoReader.changesPublisher
+            .throttle(for: .seconds(10), scheduler: DispatchQueue.main, latest: true)
+            .sink { [weak self] in Task { await self?.load() } }
+            .store(in: &cancellables)
+        settings.publisher
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in Task { await self?.load() } }
+            .store(in: &cancellables)
+    }
 
     public func load() async {
+        let selected = try? driveManager.selectedDrive()
+        if metadataProgress.libraryScope != selected.map({ "\($0.id):\($0.rootFolderId)" }) {
+            metadataProgress = MetadataIndexProgress()
+        }
+        Task {
+            guard let drive = try? driveManager.selectedDrive(), !drive.rootFolderId.isEmpty else { return }
+            do { try await preparedIndex.refresh(driveId: drive.id, rootId: drive.rootFolderId) } catch {
+            /* Cached places remain available when the remote index is missing or unavailable. */ }
+        }
+        let generation = UUID()
+        loadGeneration = generation
+        geocodingTask?.cancel()
         state = .loading
-
+        let knownNames = Dictionary(
+            placeGroups.compactMap { group in group.placeName.map { (group.id, $0) } },
+            uniquingKeysWith: { first, _ in first }
+        )
+        placeGroups = []
         let auth = assetReader.currentAuthorization()
-        switch auth {
-        case .notDetermined:
-            state = .permissionNeeded
-            return
-        case .denied, .restricted:
-            state = .permissionDenied
-            return
-        case .authorized, .limited:
-            break
-        }
-
-        let cloudPhotos = (try? photoReader.allPhotos()) ?? []
-        // Seules les photos qui ont un localIdentifier non vide ont une chance
-        // d'être matchées avec un PHAsset. Pour les photos uploadées depuis le
-        // web (sans passage par cette app), on n'a aucune info GPS exploitable.
-        let withLocalID = cloudPhotos.filter { !$0.localIdentifier.isEmpty }
-        guard !withLocalID.isEmpty else {
-            state = .empty
+        let cloudPhotos: [PhotoSnapshot]
+        do {
+            let drive = try driveManager.selectedDrive()
+            cloudPhotos = try photoReader.allPhotos().filter {
+                $0.isAvailable && $0.driveId == drive?.id && $0.libraryRootId == drive?.rootFolderId
+            }
+        } catch {
+            state = .error(message: error.localizedDescription)
             return
         }
-
-        let identifiers = withLocalID.map(\.localIdentifier)
-        let locations = await assetReader.fetchLocations(forLocalIdentifiers: identifiers)
-
-        // Index locId → AssetLocation pour un join O(n).
-        let locationByID = Dictionary(uniqueKeysWithValues: locations.map { ($0.localIdentifier, $0) })
-
-        let points: [PhotoMapPoint] = withLocalID.compactMap { photo in
-            guard let loc = locationByID[photo.localIdentifier] else { return nil }
-            return PhotoMapPoint(photo: photo, latitude: loc.latitude, longitude: loc.longitude)
-        }
-
-        if points.isEmpty {
-            state = .empty
-            placeGroups = []
+        // Cloud coordinates never require access to the iPhone photo library.
+        let identifiers = cloudPhotos.filter { $0.coordinate == nil && !$0.localIdentifier.isEmpty }.map(\.localIdentifier)
+        let locations = (auth == .authorized || auth == .limited)
+            ? await assetReader.fetchLocations(forLocalIdentifiers: identifiers) : []
+        guard generation == loadGeneration, !Task.isCancelled else { return }
+        let points = Self.makePoints(photos: cloudPhotos, localLocations: locations)
+        guard !points.isEmpty else {
+            switch auth {
+            case .notDetermined: state = .permissionNeeded
+            case .denied, .restricted: state = .permissionDenied
+            case .authorized, .limited: state = .empty
+            }
             return
         }
 
@@ -131,10 +160,37 @@ public final class PhotoMapViewModel: ObservableObject {
         // Clustering géographique grossier pour obtenir une liste de "lieux".
         // ~50km de seuil : on regroupe à l'échelle ville/agglo. Si l'utilisateur
         // veut une granularité plus fine, on basculera vers la vue carte (clusters MapKit).
-        placeGroups = Self.clusterIntoPlaces(points: points, radiusKm: 50)
+        let groups = await Task.detached(priority: .userInitiated) { Self.clusterIntoPlaces(points: points, radiusKm: 50) }.value
+        guard generation == loadGeneration, !Task.isCancelled else { return }
+        placeGroups = groups
+        for index in placeGroups.indices {
+            placeGroups[index].placeName = knownNames[placeGroups[index].id]
+        }
         // Reverse-geocoding en arrière-plan, séquentiel pour respecter le rate
         // limit CLGeocoder (~1 req/s en pratique).
-        Task { await resolvePlaceNames() }
+        geocodingTask = Task { await resolvePlaceNames(generation: generation) }
+    }
+
+    static func makePoints(photos: [PhotoSnapshot], localLocations: [AssetLocation]) -> [PhotoMapPoint] {
+        var local: [String: AssetLocation] = [:]
+        for location in localLocations {
+            local[location.localIdentifier] = location
+        }
+        return photos.compactMap { photo in
+            let fallback = local[photo.localIdentifier].flatMap {
+                MediaCoordinate(latitude: $0.latitude, longitude: $0.longitude)
+            }
+            let embedded = ["embedded", "photokit"].contains(photo.locationSource) ? photo.coordinate : nil
+            guard let coordinate = embedded ?? fallback else { return nil }
+            return PhotoMapPoint(photo: photo, latitude: coordinate.latitude, longitude: coordinate.longitude)
+        }
+    }
+
+    public func stopMetadata() async { await metadataIndexer.stop() }
+
+    public func retryMetadata() async {
+        guard let drive = try? driveManager.selectedDrive(), !drive.rootFolderId.isEmpty else { return }
+        await metadataIndexer.retry(driveId: drive.id, rootId: drive.rootFolderId)
     }
 
     public func requestPhotoLibraryAccess() async {
@@ -163,15 +219,17 @@ public final class PhotoMapViewModel: ObservableObject {
 
     /// Clustering greedy par distance Haversine. O(n²) — acceptable pour quelques
     /// centaines de photos. À optimiser (grid index) au-delà.
-    private static func clusterIntoPlaces(points: [PhotoMapPoint], radiusKm: Double) -> [PlaceGroup] {
+    private nonisolated static func clusterIntoPlaces(points: [PhotoMapPoint], radiusKm: Double) -> [PlaceGroup] {
         var clusters: [[PhotoMapPoint]] = []
         for point in points {
             // Cherche un cluster existant dont le centre est à <radiusKm.
             if let idx = clusters.firstIndex(where: { cluster in
                 guard let first = cluster.first else { return false }
                 return distanceKm(
-                    lat1: first.latitude, lon1: first.longitude,
-                    lat2: point.latitude, lon2: point.longitude
+                    lat1: first.latitude,
+                    lon1: first.longitude,
+                    lat2: point.latitude,
+                    lon2: point.longitude
                 ) < radiusKm
             }) {
                 clusters[idx].append(point)
@@ -205,7 +263,7 @@ public final class PhotoMapViewModel: ObservableObject {
     }
 
     /// Formule de Haversine. Renvoie la distance en km entre deux points GPS.
-    private static func distanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double) -> Double {
+    private nonisolated static func distanceKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double) -> Double {
         let earthRadiusKm = 6371.0
         let dLat = (lat2 - lat1) * .pi / 180
         let dLon = (lon2 - lon1) * .pi / 180
@@ -219,15 +277,18 @@ public final class PhotoMapViewModel: ObservableObject {
     /// Résout `placeName` pour chaque groupe en séquentiel — CLGeocoder est rate-
     /// limited (sous le capot ~1 req/s côté Apple). On stoppe net si la View a
     /// disparu (Task annulée).
-    private func resolvePlaceNames() async {
+    private func resolvePlaceNames(generation: UUID) async {
         let geocoder = CLGeocoder()
         for (idx, group) in placeGroups.enumerated() {
+            guard generation == loadGeneration, !Task.isCancelled else { return }
+            if group.placeName != nil { continue }
             let location = CLLocation(latitude: group.centerLatitude, longitude: group.centerLongitude)
             do {
                 let placemarks = try await geocoder.reverseGeocodeLocation(location)
                 if let placemark = placemarks.first,
                    let name = Self.formatClusterAddress(placemark),
-                   idx < placeGroups.count {
+                   generation == loadGeneration, !Task.isCancelled,
+                   idx < placeGroups.count, placeGroups[idx].id == group.id {
                     placeGroups[idx].placeName = name
                 }
             } catch {

@@ -27,7 +27,8 @@ final class DeletionRetryClassifierTests: XCTestCase {
             error: PhotoAPIError.network(underlying: "down"), attemptCount: 1
         )
         guard case .transient(let retryAfter) = decision else {
-            return XCTFail("Attendu .transient, obtenu \(decision)")
+            XCTFail("Attendu .transient, obtenu \(decision)")
+            return
         }
         XCTAssertEqual(retryAfter, 15, accuracy: 0.01)
     }
@@ -36,12 +37,14 @@ final class DeletionRetryClassifierTests: XCTestCase {
         guard case .transient = DeletionRetryClassifier.classify(
             error: PhotoAPIError.rateLimited(retryAfter: nil), attemptCount: 1
         ) else {
-            return XCTFail("rateLimited doit être transient")
+            XCTFail("rateLimited doit être transient")
+            return
         }
         guard case .transient = DeletionRetryClassifier.classify(
             error: PhotoAPIError.server(statusCode: 503, message: nil), attemptCount: 1
         ) else {
-            return XCTFail("5xx doit être transient")
+            XCTFail("5xx doit être transient")
+            return
         }
     }
 
@@ -79,7 +82,8 @@ final class DeletionRetryClassifierTests: XCTestCase {
         guard case .transient = DeletionRetryClassifier.classify(
             error: CocoaError(.fileNoSuchFile), attemptCount: 1
         ) else {
-            return XCTFail("Une erreur inconnue doit être retentée au moins une fois")
+            XCTFail("Une erreur inconnue doit être retentée au moins une fois")
+            return
         }
     }
 
@@ -198,9 +202,15 @@ final class PhotoDeletionEngineTests: XCTestCase {
 
     private func item(fileId: String) -> DeletionItemSnapshot {
         DeletionItemSnapshot(
-            fileId: fileId, driveId: 1, localIdentifier: "", state: .queued,
-            enqueuedAt: Date(), attemptCount: 0, lastAttemptAt: nil,
-            nextRetryAt: nil, lastErrorReason: ""
+            fileId: fileId,
+            driveId: 1,
+            localIdentifier: "",
+            state: .queued,
+            enqueuedAt: Date(),
+            attemptCount: 0,
+            lastAttemptAt: nil,
+            nextRetryAt: nil,
+            lastErrorReason: ""
         )
     }
 }
@@ -231,6 +241,7 @@ private final class FakeDeletionQueueWriter: DeletionQueueWriting {
     var resetOrphanedCallCount = 0
 
     func enqueueDeletion(fileId: String, driveId: Int, localIdentifier: String) async throws {}
+    func enqueueDeletions(_ requests: [DeletionRequest]) async throws {}
     func markDeleting(fileId: String) async throws { markedDeleting.append(fileId) }
     func markDeletionCompleted(fileId: String) async throws { markedCompleted.append(fileId) }
     func markDeletionFailedTransient(fileId: String, reason: String, nextRetryAt: Date) async throws {
@@ -299,6 +310,8 @@ private final class FakeDeletionApi: PhotoApiFetching {
         Data()
     }
 
+    func downloadFile(driveId: Int, fileId: String) async throws -> URL { throw PhotoAPIError.invalidResponse }
+    func playbackURL(driveId: Int, fileId: String) async throws -> URL { throw PhotoAPIError.invalidResponse }
     func downloadURL(driveId: Int, fileId: String) -> URL {
         Endpoint.download(driveId: driveId, fileId: fileId).url
     }

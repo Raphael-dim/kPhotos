@@ -65,6 +65,16 @@ public protocol PhotoApiFetching: AnyObject {
     func thumbnailData(driveId: Int, fileId: String) async throws -> Data
     func thumbnailData(driveId: Int, fileId: String, revision: String, priority: Int) async throws -> Data
     func previewData(driveId: Int, fileId: String, width: Int?, height: Int?, quality: Int?) async throws -> Data
+    func downloadFile(driveId: Int, fileId: String) async throws -> URL
+    func originalMetadata(driveId: Int, fileId: String, isVideo: Bool) async throws -> EmbeddedMediaMetadata
+    func saveMediaIndex(
+        _ index: MediaLibraryIndex,
+        name: String,
+        previous: MediaIndexUploadState?,
+        clientToken: String
+    ) async throws -> MediaIndexUploadState
+    func mediaIndex(driveId: Int, rootId: String) async throws -> (String, MediaLibraryIndex)?
+    func playbackURL(driveId: Int, fileId: String) async throws -> URL
     func downloadURL(driveId: Int, fileId: String) -> URL
     func previewURL(driveId: Int, fileId: String) -> URL
     func deleteFile(driveId: Int, fileId: String) async throws
@@ -75,6 +85,20 @@ public extension PhotoApiFetching {
     func thumbnailData(driveId: Int, fileId: String, revision: String, priority: Int) async throws -> Data {
         try await thumbnailData(driveId: driveId, fileId: fileId)
     }
+
+    func saveMediaIndex(
+        _ index: MediaLibraryIndex,
+        name: String,
+        previous: MediaIndexUploadState?,
+        clientToken: String
+    ) async throws -> MediaIndexUploadState {
+        throw PhotoAPIError.invalidResponse
+    }
+
+    func mediaIndex(driveId: Int, rootId: String) async throws -> (String, MediaLibraryIndex)? { nil }
+    func originalMetadata(driveId: Int, fileId: String, isVideo: Bool) async throws -> EmbeddedMediaMetadata {
+        throw PhotoAPIError.invalidResponse
+    }
 }
 
 public final class PhotoApiFetcher: PhotoApiFetching {
@@ -82,6 +106,7 @@ public final class PhotoApiFetcher: PhotoApiFetching {
     static let baseBackoff: TimeInterval = 0.5
 
     let session: Session
+    let binaryReadConfiguration: URLSessionConfiguration
     let decoder: JSONDecoder
     private let requestBudget: APIRequestBudget?
 
@@ -89,6 +114,7 @@ public final class PhotoApiFetcher: PhotoApiFetching {
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 60
         configuration.timeoutIntervalForResource = 600
+        self.binaryReadConfiguration = .ephemeral
         self.session = Session(configuration: configuration, interceptor: interceptor)
         self.decoder = decoder
         self.requestBudget = .shared
@@ -96,6 +122,7 @@ public final class PhotoApiFetcher: PhotoApiFetching {
 
     // Inject a local URLProtocol in transport tests without real credentials or network.
     init(configuration: URLSessionConfiguration) {
+        self.binaryReadConfiguration = configuration
         self.session = Session(configuration: configuration)
         self.decoder = .kPhotos
         self.requestBudget = nil

@@ -76,7 +76,9 @@ final class PhotoModelTests: XCTestCase {
             syncStatus: .synced,
             isFavorite: true
         )
-        let photo = PhotoManagerImpl.makePhoto(from: snapshot)
+        snapshot.resourceRevisions = ["original": "révision-\"1\""]
+        let photo = try PhotoManagerImpl.makePhoto(from: snapshot)
+        XCTAssertEqual(PhotoSnapshot(photo).resourceRevisions, snapshot.resourceRevisions)
         XCTAssertEqual(photo.fileId, "F1")
         XCTAssertEqual(photo.driveId, 5)
         XCTAssertEqual(photo.localIdentifier, "L1")

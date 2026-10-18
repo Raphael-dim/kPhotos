@@ -16,6 +16,7 @@
  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+import Combine
 import Foundation
 import RealmSwift
 
@@ -27,6 +28,11 @@ public protocol PhotoReading: AnyObject {
     func photo(byFileId fileId: String) throws -> PhotoSnapshot?
     func photo(byLocalIdentifier localIdentifier: String) throws -> PhotoSnapshot?
     func allPhotos() throws -> [PhotoSnapshot]
+    var changesPublisher: AnyPublisher<Void, Never> { get }
+}
+
+public extension PhotoReading {
+    var changesPublisher: AnyPublisher<Void, Never> { Empty().eraseToAnyPublisher() }
 }
 
 public protocol PhotoWriting: AnyObject {
@@ -40,12 +46,24 @@ public protocol PhotoWriting: AnyObject {
     /// (qui matche par `localIdentifier`) → photos dupliquées dans la galerie.
     func upsertFromListing(_ photos: [PhotoSnapshot]) async throws
     func commitListing(
-        _ photos: [PhotoSnapshot], driveId: Int, folderId: String,
-        fileIds: Set<String>, revisions: [String: String]
+        _ photos: [PhotoSnapshot],
+        driveId: Int,
+        folderId: String,
+        fileIds: Set<String>,
+        revisions: [String: String]
     ) async throws
+    func updateEmbeddedMetadata(driveId: Int, fileId: String, revision: String, metadata: EmbeddedMediaMetadata) async throws
+    func applyMediaIndex(_ index: MediaLibraryIndex) async throws
     func updateSyncStatus(fileId: String, status: PhotoSyncStatus) async throws
     func setFavorite(fileId: String, isFavorite: Bool) async throws
     func delete(fileId: String) async throws
+}
+
+public extension PhotoWriting {
+    func applyMediaIndex(_ index: MediaLibraryIndex) async throws { throw PhotoAPIError.invalidResponse }
+    func updateEmbeddedMetadata(driveId: Int, fileId: String, revision: String, metadata: EmbeddedMediaMetadata) async throws {
+        throw PhotoAPIError.invalidResponse
+    }
 }
 
 /// File de sauvegarde persistante. Indexée par `localIdentifier` du PHAsset.
@@ -72,6 +90,9 @@ public protocol BackupQueueReading: AnyObject {
 }
 
 public protocol BackupQueueWriting: AnyObject {
+    /// Réconcilie toute la photothèque en une transaction, sans rouvrir Realm
+    /// pour chaque photo. Les items déjà connus gardent leur clientToken.
+
     /// Ajoute un asset s'il n'est pas déjà en file. No-op si un item existe déjà
     /// pour ce `localIdentifier` (quel que soit son état) — la dédup est gérée
     /// par la clé primaire Realm + ce garde-fou.
@@ -143,6 +164,8 @@ public protocol DeletionQueueReading: AnyObject {
 }
 
 public protocol DeletionQueueWriting: AnyObject {
+    /// A Live Photo's still and motion must enter the queue in one Realm transaction.
+    func enqueueDeletions(_ requests: [DeletionRequest]) async throws
     /// Enqueue une suppression. No-op si un item existe déjà pour ce `fileId`
     /// (sauf s'il était en `.failedPermanent` — auquel cas on le re-queue,
     /// l'utilisateur a explicitement re-déclenché la suppression).
@@ -177,6 +200,15 @@ public protocol DeletionQueueWriting: AnyObject {
     /// `.queued`. Cas crash mi-deletion. Retourne le nombre d'items reset.
     @discardableResult
     func resetOrphanedDeletions() async throws -> Int
+}
+
+public struct DeletionRequest: Sendable {
+    public let fileId: String
+    public let driveId: Int
+    public let localIdentifier: String
+    public init(fileId: String, driveId: Int, localIdentifier: String) {
+        self.fileId = fileId; self.driveId = driveId; self.localIdentifier = localIdentifier
+    }
 }
 
 public typealias DeletionQueueing = DeletionQueueReading & DeletionQueueWriting
@@ -214,26 +246,153 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
         }
     }
 
+    public var changesPublisher: AnyPublisher<Void, Never> {
+        do {
+            return try Realm(configuration: realm.configuration).objects(Photo.self)
+                .collectionPublisher.map { _ in () }.replaceError(with: ()).eraseToAnyPublisher()
+        } catch {
+            // Database errors remain visible through the throwing read methods.
+            return Empty().eraseToAnyPublisher()
+        }
+    }
+
     // MARK: - PhotoWriting
 
     public func upsert(_ snapshot: PhotoSnapshot) async throws {
         try await realm.write { realm in
-            let photo = Self.makePhoto(from: snapshot)
+            let photo = try Self.makePhoto(from: snapshot)
             realm.add(photo, update: .modified)
         }
     }
 
     public func upsert(_ snapshots: [PhotoSnapshot]) async throws {
         try await realm.write { realm in
-            let photos = snapshots.map(Self.makePhoto(from:))
+            let photos = try snapshots.map(Self.makePhoto(from:))
             realm.add(photos, update: .modified)
+        }
+    }
+
+    public func commitListing(
+        _ snapshots: [PhotoSnapshot],
+        driveId: Int,
+        folderId: String,
+        fileIds: Set<String>,
+        revisions: [String: String]
+    ) async throws {
+        try await realm.write { realm in
+            // A completed scan only hides stale cache entries; it never deletes user data.
+            for existing in realm.objects(Photo.self).filter("driveId == %@ AND libraryRootId == %@", driveId, folderId) {
+                existing.isAvailable = false
+            }
+            for snapshot in snapshots {
+                let photo = try Self.makePhoto(from: snapshot)
+                if let existing = realm.object(ofType: Photo.self, forPrimaryKey: snapshot.id), existing.driveId == driveId {
+                    if photo.remoteRevision == existing.remoteRevision {
+                        photo.thumbnailPackJSON = existing.thumbnailPackJSON
+                        photo.embeddedMetadataJSON = existing.embeddedMetadataJSON
+                        photo.embeddedMetadataRevision = existing.embeddedMetadataRevision
+                        if let embedded = PhotoSnapshot(existing).embeddedMetadata {
+                            photo.latitude = embedded.coordinate?.latitude
+                            photo.longitude = embedded.coordinate?.longitude
+                            photo.locationSource = embedded.coordinate == nil ? "" : "embedded"
+                            if let date = embedded.captureDate {
+                                photo.takenAt = date
+                                photo.captureDateSource = embedded.hasExplicitTimezone ? "embedded_offset" : "embedded_local"
+                            }
+                        } else if existing.locationSource == "photokit" {
+                            photo.latitude = existing.latitude
+                            photo.longitude = existing.longitude
+                            photo.locationSource = existing.locationSource
+                        }
+                    }
+                    photo.localIdentifier = existing.localIdentifier
+                    photo.isFavorite = existing.isFavorite
+                    photo.albumIds.removeAll()
+                    photo.albumIds.append(objectsIn: existing.albumIds)
+                    photo.resourceRevisionsJSON = existing.resourceRevisionsJSON
+                    photo.localModifiedAt = existing.localModifiedAt
+                    photo.resourceFileIds.removeAll()
+                    photo.resourceFileIds.append(objectsIn: existing.resourceFileIds)
+                    photo.backupComplete = existing.backupComplete && !existing.resourceFileIds.isEmpty
+                        && Set(existing.resourceFileIds).isSubset(of: fileIds)
+                    let expected = PhotoSnapshot(existing).resourceRevisions
+                    photo.backupComplete = photo.backupComplete && !expected.isEmpty
+                        && expected.allSatisfy { !$0.value.isEmpty && revisions[$0.key] == $0.value }
+                    if photo.contentSHA256.isEmpty,
+                       photo.remoteRevision == existing.remoteRevision { photo.contentSHA256 = existing.contentSHA256 }
+                    if !existing.localIdentifier.isEmpty {
+                        photo.takenAt = existing.takenAt
+                        photo.captureDateSource = "photokit"
+                    }
+                }
+                photo.libraryRootId = folderId
+                photo.isAvailable = true
+                realm.add(photo, update: .modified)
+            }
+        }
+    }
+
+    public func updateEmbeddedMetadata(
+        driveId: Int,
+        fileId: String,
+        revision: String,
+        metadata: EmbeddedMediaMetadata
+    ) async throws {
+        let json = try String(decoding: JSONEncoder().encode(metadata), as: UTF8.self)
+        try await realm.write { realm in
+            guard let photo = realm.object(ofType: Photo.self, forPrimaryKey: fileId),
+                  photo.driveId == driveId, photo.isAvailable, photo.remoteRevision == revision else { return }
+            photo.embeddedMetadataJSON = json
+            photo.embeddedMetadataRevision = revision
+            if let coordinate = metadata.coordinate {
+                photo.latitude = coordinate.latitude; photo.longitude = coordinate.longitude; photo.locationSource = "embedded"
+            } else if photo.locationSource != "photokit", !metadata.isPartial {
+                photo.latitude = nil; photo.longitude = nil; photo.locationSource = ""
+            }
+            if let duration = metadata.duration { photo.duration = duration }
+            if let date = metadata.captureDate, photo.localIdentifier.isEmpty {
+                photo.takenAt = date
+                photo.captureDateSource = metadata.hasExplicitTimezone ? "embedded_offset" : "embedded_local"
+            }
+        }
+    }
+
+    /// A prepared index applies in one transaction, preserving all unrelated client state.
+    public func applyMediaIndex(_ index: MediaLibraryIndex) async throws {
+        try index.validate(driveId: index.driveId, rootId: index.rootId)
+        let records = try index.records.map { record in
+            try (
+                record,
+                String(decoding: JSONEncoder().encode(record.metadata), as: UTF8.self),
+                record.thumbnailPack.map { try String(decoding: JSONEncoder().encode($0), as: UTF8.self) }
+            )
+        }
+        try await realm.write { realm in
+            for (record, json, pack) in records {
+                guard let photo = realm.object(ofType: Photo.self, forPrimaryKey: record.fileId),
+                      photo.driveId == index.driveId, photo.libraryRootId == index.rootId, photo.isAvailable,
+                      photo.remoteRevision == record.revision else { continue }
+                if let pack { photo.thumbnailPackJSON = pack }
+                photo.embeddedMetadataJSON = json
+                photo.embeddedMetadataRevision = record.revision
+                if let coordinate = record.metadata.coordinate {
+                    photo.latitude = coordinate.latitude; photo.longitude = coordinate.longitude; photo
+                        .locationSource = "embedded"
+                } else if photo.locationSource != "photokit", !record.metadata.isPartial {
+                    photo.latitude = nil; photo.longitude = nil; photo.locationSource = ""
+                }
+                if let date = record.metadata.captureDate, photo.localIdentifier.isEmpty {
+                    photo.takenAt = date
+                    photo.captureDateSource = record.metadata.hasExplicitTimezone ? "embedded_offset" : "embedded_local"
+                }
+            }
         }
     }
 
     public func upsertFromListing(_ snapshots: [PhotoSnapshot]) async throws {
         try await realm.write { realm in
             for snapshot in snapshots {
-                let photo = Self.makePhoto(from: snapshot)
+                let photo = try Self.makePhoto(from: snapshot)
                 let existing = realm.object(ofType: Photo.self, forPrimaryKey: snapshot.id)
 
                 // Reconstruction du `localIdentifier` : ordre de préférence
@@ -251,39 +410,31 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
 
                 // Champs client-side absents du listing — on garde l'existant.
                 if let existing {
-                    photo.isFavorite = existing.isFavorite
-                    photo.albumIds.removeAll()
-                    photo.albumIds.removeAll()
-                    photo.albumIds.append(objectsIn: existing.albumIds)
-                }
-
-                realm.add(photo, update: .modified)
-            }
-        }
-    }
-
-    public func commitListing(
-        _ snapshots: [PhotoSnapshot], driveId: Int, folderId: String,
-        fileIds: Set<String>, revisions: [String: String]
-    ) async throws {
-        try await realm.write { realm in
-            for existing in realm.objects(Photo.self).filter("driveId == %@ AND libraryRootId == %@", driveId, folderId) {
-                existing.isAvailable = false
-            }
-            for snapshot in snapshots {
-                let photo = Self.makePhoto(from: snapshot)
-                if let existing = realm.object(ofType: Photo.self, forPrimaryKey: snapshot.id), existing.driveId == driveId {
-                    photo.localIdentifier = existing.localIdentifier
-                    photo.isFavorite = existing.isFavorite
-                    photo.albumIds.removeAll()
-                    photo.albumIds.append(objectsIn: existing.albumIds)
+                    if photo.locationSource.isEmpty, photo.remoteRevision == existing.remoteRevision {
+                        photo.thumbnailPackJSON = existing.thumbnailPackJSON
+                        photo.embeddedMetadataJSON = existing.embeddedMetadataJSON
+                        photo.embeddedMetadataRevision = existing.embeddedMetadataRevision
+                        photo.latitude = existing.latitude
+                        photo.longitude = existing.longitude
+                        photo.locationSource = existing.locationSource
+                    }
+                    photo.libraryRootId = existing.libraryRootId
+                    photo.isAvailable = existing.isAvailable
+                    photo.contentSHA256 = existing.contentSHA256
+                    photo.backupComplete = existing.backupComplete
+                    photo.resourceRevisionsJSON = existing.resourceRevisionsJSON
+                    photo.localModifiedAt = existing.localModifiedAt
+                    photo.resourceFileIds.removeAll()
+                    photo.resourceFileIds.append(objectsIn: existing.resourceFileIds)
                     if !existing.localIdentifier.isEmpty {
                         photo.takenAt = existing.takenAt
                         photo.captureDateSource = "photokit"
                     }
+                    photo.isFavorite = existing.isFavorite
+                    photo.albumIds.removeAll()
+                    photo.albumIds.append(objectsIn: existing.albumIds)
                 }
-                photo.libraryRootId = folderId
-                photo.isAvailable = true
+
                 realm.add(photo, update: .modified)
             }
         }
@@ -524,26 +675,29 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
         driveId: Int,
         localIdentifier: String
     ) async throws {
-        guard !fileId.isEmpty else { return }
+        try await enqueueDeletions([DeletionRequest(fileId: fileId, driveId: driveId, localIdentifier: localIdentifier)])
+    }
+
+    public func enqueueDeletions(_ requests: [DeletionRequest]) async throws {
         try await realm.write { realm in
-            if let existing = realm.object(ofType: DeletionItem.self, forPrimaryKey: fileId) {
-                // Si l'item existait en `.failedPermanent`, on re-déclenche : c'est
-                // équivalent à un "Réessayer". Sinon (queued/deleting/failedTransient)
-                // on no-op pour rester idempotent.
-                if existing.state == .failedPermanent {
-                    existing.state = .queued
-                    existing.lastErrorReason = ""
-                    existing.nextRetryAt = nil
+            for request in requests where !request.fileId.isEmpty {
+                if let existing = realm.object(ofType: DeletionItem.self, forPrimaryKey: request.fileId) {
+                    // Requeue explicit retries; other in-flight requests stay idempotent.
+                    if existing.state == .failedPermanent {
+                        existing.state = .queued
+                        existing.lastErrorReason = ""
+                        existing.nextRetryAt = nil
+                    }
+                    continue
                 }
-                return
+                let item = DeletionItem()
+                item.fileId = request.fileId
+                item.driveId = request.driveId
+                item.localIdentifier = request.localIdentifier
+                item.state = .queued
+                item.enqueuedAt = Date()
+                realm.add(item)
             }
-            let item = DeletionItem()
-            item.fileId = fileId
-            item.driveId = driveId
-            item.localIdentifier = localIdentifier
-            item.state = .queued
-            item.enqueuedAt = Date()
-            realm.add(item)
         }
     }
 
@@ -692,17 +846,21 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
 
     /// Construit un Photo (unmanaged) à partir d'un snapshot. À appeler à l'intérieur d'un
     /// block `realm.write`, juste avant `realm.add(photo, update: .modified)`.
-    static func makePhoto(from snapshot: PhotoSnapshot) -> Photo {
+    static func makePhoto(from snapshot: PhotoSnapshot) throws -> Photo {
         let photo = Photo()
         photo.fileId = snapshot.id
         photo.driveId = snapshot.driveId
         photo.localIdentifier = snapshot.localIdentifier
         photo.name = snapshot.name
-        photo.captureDateSource = snapshot.captureDateSource
-        photo.remoteRevision = snapshot.remoteRevision
-        photo.isAvailable = snapshot.isAvailable
-        photo.libraryRootId = snapshot.libraryRootId
         photo.takenAt = snapshot.takenAt
+        photo.captureDateSource = snapshot.captureDateSource
+        photo.latitude = snapshot.coordinate?.latitude
+        photo.longitude = snapshot.coordinate?.longitude
+        photo.locationSource = snapshot.locationSource
+        photo.thumbnailPackJSON = snapshot.thumbnailPack
+            .flatMap { try? String(decoding: JSONEncoder().encode($0), as: UTF8.self) } ?? ""
+        photo.embeddedMetadataJSON = snapshot.embeddedMetadataJSON
+        photo.embeddedMetadataRevision = snapshot.embeddedMetadataRevision
         photo.uploadedAt = snapshot.uploadedAt
         photo.mimeType = snapshot.mimeType
         photo.size = snapshot.size
@@ -712,6 +870,14 @@ public final class PhotoManagerImpl: PhotoReading, PhotoWriting, BackupQueueRead
         photo.albumIds.append(objectsIn: snapshot.albumIds)
         photo.syncStatusRaw = snapshot.syncStatus.rawValue
         photo.isFavorite = snapshot.isFavorite
+        photo.libraryRootId = snapshot.libraryRootId
+        photo.isAvailable = snapshot.isAvailable
+        photo.contentSHA256 = snapshot.contentSHA256
+        photo.remoteRevision = snapshot.remoteRevision
+        photo.localModifiedAt = snapshot.localModifiedAt
+        photo.resourceRevisionsJSON = try String(decoding: JSONEncoder().encode(snapshot.resourceRevisions), as: UTF8.self)
+        photo.backupComplete = snapshot.backupComplete
+        photo.resourceFileIds.append(objectsIn: snapshot.resourceFileIds)
         return photo
     }
 }

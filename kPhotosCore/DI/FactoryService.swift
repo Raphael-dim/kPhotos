@@ -21,7 +21,7 @@ import Foundation
 public enum FactoryService {
     public static let store = SimpleResolver.sharedResolver
 
-    /// À appeler une seule fois au démarrage (`kPhotosApp.init`).
+    /// À appeler une seule fois au démarrage (`KPhotosApp.init`).
     public static func registerAll(authConfig: AuthConfig = .infomaniak) {
         registerInfrastructure()
         registerAuth(config: authConfig)
@@ -154,6 +154,24 @@ public enum FactoryService {
     }
 
     private static func registerSync() {
+        store.store(factory: Factory(type: PreparedMediaIndexSyncing.self) { _, _ in
+            PreparedMediaIndexSync(api: resolve(), writer: resolve(), reader: resolve(), drives: resolve())
+        })
+        store.store(factory: Factory(type: MediaIndexPublishing.self) { _, _ in
+            MediaIndexPublisher(api: resolve(), reader: resolve())
+        })
+        store.store(factory: Factory(type: MetadataIndexStoring.self) { _, _ in
+            MetadataIndexStore(realm: resolve())
+        })
+        store.store(factory: Factory(type: EmbeddedMetadataIndexing.self) { _, _ in
+            EmbeddedMetadataIndexer(
+                api: resolve(),
+                writer: resolve(),
+                store: resolve(),
+                reachability: resolve(),
+                publisher: resolve()
+            )
+        })
         store.store(factory: Factory(type: PhotoSyncing.self) { _, _ in
             PhotoSyncEngine(
                 api: resolve(),
@@ -167,6 +185,9 @@ public enum FactoryService {
                 reachability: resolve(),
                 uploadQueue: resolve()
             )
+        })
+        store.store(factory: Factory(type: LibraryPreparationScheduling.self) { _, _ in
+            LibraryPreparationScheduler(drives: resolve(), indexer: resolve(), preparedIndex: resolve())
         })
         store.store(factory: Factory(type: BackgroundSyncScheduling.self) { _, _ in
             BackgroundSyncScheduler(

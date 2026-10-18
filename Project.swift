@@ -82,7 +82,8 @@ let appTarget = TargetFactory.app(
         // laisser l'OS arbitrer.
         "BGTaskSchedulerPermittedIdentifiers": [
             "\(Constants.bundleIdentifierPrefix).sync.refresh",
-            "\(Constants.bundleIdentifierPrefix).sync.processing"
+            "\(Constants.bundleIdentifierPrefix).sync.processing",
+            "app.kphotos.library.processing"
         ],
         "NSPhotoLibraryUsageDescription": "kPhotos sauvegarde vos photos sur votre kDrive.",
         "NSPhotoLibraryAddUsageDescription": "kPhotos enregistre les photos téléchargées dans votre photothèque.",

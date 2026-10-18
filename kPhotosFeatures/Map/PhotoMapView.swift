@@ -17,6 +17,7 @@
  */
 
 import kPhotosCore
+import kPhotosCoreUI
 import kPhotosResources
 import MapKit
 import SwiftUI
@@ -28,52 +29,58 @@ import SwiftUI
 public struct PhotoMapView: View {
     @StateObject private var viewModel = PhotoMapViewModel()
     @State private var selectedPhotos: SelectedPhotos?
-    @State private var viewerPresentation: ViewerPresentation?
-    @Namespace private var viewerNamespace
+    @State private var showPreparation = false
 
     public init() {}
 
     public var body: some View {
         NavigationStack {
-            content
-                .navigationTitle(L10n.Map.title)
-                .navigationBarTitleDisplayMode(.large)
-                .task { await viewModel.load() }
-                .sheet(item: $selectedPhotos) { selection in
-                    PhotoLocationSheet(
-                        photos: selection.photos,
-                        initialTitle: selection.title,
-                        preciseCoordinate: selection.preciseCoordinate,
-                        onTap: { index in
-                            // Délai pour laisser le sheet se fermer proprement
-                            // avant de pousser le cover plein écran (sinon iOS
-                            // refuse la transition modale par-dessus une autre).
-                            let photos = selection.photos
-                            selectedPhotos = nil
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                                viewerPresentation = ViewerPresentation(
-                                    photos: photos,
-                                    index: index
-                                )
-                            }
-                        }
-                    )
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
+            ScrollView {
+                VStack(spacing: 20) {
+                    if viewModel.metadataProgress.total > 0 || viewModel.metadataProgress.isRunning
+                        || viewModel.metadataProgress.isPaused {
+                        preparationStatus
+                            .padding(.horizontal, 16)
+                    }
+                    content
                 }
-                .fullScreenCover(item: $viewerPresentation) { presentation in
-                    FullscreenMediaView(
-                        media: presentation.photos.map(ViewerMedia.cloud),
-                        initialIndex: presentation.index,
-                        namespace: viewerNamespace,
-                        onClose: { viewerPresentation = nil }
-                    )
+                .padding(.vertical, 16)
+            }
+            .toolbar {
+                ToolbarItem(placement: .appPrimaryAction) {
+                    Button { showPreparation = true } label: { Image(systemName: "ellipsis") }
+                        .accessibilityLabel(L10n.Common.more)
                 }
+            }
+            .navigationTitle(L10n.Map.title)
+            .navigationBarTitleDisplayMode(.large)
+            .task { await viewModel.load() }
+            .sheet(isPresented: $showPreparation) { PlacePreparationSheet(viewModel: viewModel) }
+            .sheet(item: $selectedPhotos) { selection in
+                PhotoLocationSheet(
+                    photos: selection.photos,
+                    initialTitle: selection.title,
+                    preciseCoordinate: selection.preciseCoordinate
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+            }
         }
     }
 
-    @ViewBuilder
-    private var content: some View {
+    private var preparationStatus: some View {
+        let status = PlacePreparationStatus(progress: viewModel.metadataProgress)
+        return LibraryStatusButton(
+            title: status.title,
+            subtitle: status.subtitle,
+            symbol: status.symbol,
+            tone: status.tone,
+            progress: status.phase == .running ? status.fraction : nil,
+            action: { showPreparation = true }
+        )
+    }
+
+    @ViewBuilder private var content: some View {
         switch viewModel.state {
         case .loading:
             loadingState
@@ -96,80 +103,99 @@ public struct PhotoMapView: View {
     /// Le tap sur la minimap pousse la carte plein écran avec clusters MapKit.
     /// Le tap sur un lieu pousse la grille de photos correspondante.
     private func readyMap(points: [PhotoMapPoint]) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                NavigationLink {
-                    FullMapScreen(points: points) { tapped in
-                        let center = Self.centerCoordinate(for: tapped, in: points)
-                        selectedPhotos = SelectedPhotos(
-                            photos: tapped,
-                            title: viewModel.placeName(forAny: tapped)
-                                ?? Self.formatFallback(center),
-                            preciseCoordinate: center
-                        )
-                    }
+        VStack(alignment: .leading, spacing: 16) {
+            NavigationLink {
+                FullMapScreen(points: points) { tapped in
+                    let center = Self.centerCoordinate(for: tapped, in: points)
+                    selectedPhotos = SelectedPhotos(
+                        photos: tapped,
+                        title: viewModel.placeName(forAny: tapped)
+                            ?? Self.formatFallback(center),
+                        preciseCoordinate: center
+                    )
+                }
+            } label: {
+                miniMapPreview(points: points)
+                    .frame(height: 200)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(Color(uiColor: .separator), lineWidth: 0.5)
+                    )
+                    // `Map` interne a `.allowsHitTesting(false)`, donc sans
+                    // `contentShape` SwiftUI considère le label comme vide
+                    // côté hit-test et le NavigationLink ne fire jamais.
+                    .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .padding(.horizontal, 16)
+            }
+            .buttonStyle(.plain)
+
+            Text(L10n.Map.placesSectionTitle)
+                .font(.title3.weight(.semibold))
+                .padding(.horizontal, 16)
+                .padding(.top, 4)
+
+            ForEach(viewModel.placeGroups) { group in
+                Button {
+                    selectedPhotos = SelectedPhotos(
+                        photos: group.photos,
+                        title: group.placeName
+                            ?? String(
+                                format: "%.2f, %.2f",
+                                group.centerLatitude,
+                                group.centerLongitude
+                            ),
+                        // Pas de geocoding fin : à l'échelle d'un cluster
+                        // 50km, le centre n'est pas représentatif d'une rue.
+                        preciseCoordinate: nil
+                    )
                 } label: {
-                    miniMapPreview(points: points)
-                        .frame(height: 200)
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .strokeBorder(Color(uiColor: .separator), lineWidth: 0.5)
-                        )
-                        // `Map` interne a `.allowsHitTesting(false)`, donc sans
-                        // `contentShape` SwiftUI considère le label comme vide
-                        // côté hit-test et le NavigationLink ne fire jamais.
-                        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        .padding(.horizontal, 16)
+                    PlaceRow(group: group)
                 }
                 .buttonStyle(.plain)
-
-                Text(L10n.Map.placesSectionTitle)
-                    .font(.title3.weight(.semibold))
-                    .padding(.horizontal, 16)
-                    .padding(.top, 4)
-
-                ForEach(viewModel.placeGroups) { group in
-                    Button {
-                        selectedPhotos = SelectedPhotos(
-                            photos: group.photos,
-                            title: group.placeName
-                                ?? String(
-                                    format: "%.2f, %.2f",
-                                    group.centerLatitude,
-                                    group.centerLongitude
-                                ),
-                            // Pas de geocoding fin : à l'échelle d'un cluster
-                            // 50km, le centre n'est pas représentatif d'une rue.
-                            preciseCoordinate: nil
-                        )
-                    } label: {
-                        PlaceRow(group: group)
-                    }
-                    .buttonStyle(.plain)
-                }
             }
-            .padding(.bottom, 24)
         }
+        .padding(.bottom, 24)
     }
 
     /// Minimap statique non-interactive : aperçu cliquable de toutes les photos
     /// géolocalisées. La région inclut tous les points pour donner une vue
     /// d'ensemble. Pas de clusters MapKit ici — c'est purement décoratif.
+    @ViewBuilder
     private func miniMapPreview(points: [PhotoMapPoint]) -> some View {
-        Map(
-            coordinateRegion: .constant(Self.boundingRegion(for: points)),
-            interactionModes: [],
-            annotationItems: points
-        ) { point in
-            MapAnnotation(coordinate: CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude)) {
-                Circle()
-                    .fill(Color.accentColor)
-                    .frame(width: 8, height: 8)
-                    .overlay(Circle().stroke(.white, lineWidth: 1.5))
+        let region = Self.boundingRegion(for: points)
+        let overview = stride(from: 0, to: points.count, by: max(1, (points.count + 255) / 256)).map { points[$0] }
+        if #available(iOS 17.0, *) {
+            Map(position: .constant(.region(region)), interactionModes: []) {
+                ForEach(overview) { point in
+                    Annotation(
+                        point.photo.takenAt.formatted(date: .abbreviated, time: .omitted),
+                        coordinate: CLLocationCoordinate2D(
+                            latitude: point.latitude,
+                            longitude: point.longitude
+                        )
+                    ) {
+                        Circle()
+                            .fill(.tint)
+                            .frame(width: 8, height: 8)
+                            .overlay(Circle().stroke(.white, lineWidth: 1.5))
+                    }
+                    .annotationTitles(.hidden)
+                }
             }
+            .mapStyle(.standard(elevation: .flat, pointsOfInterest: .excludingAll))
+            .allowsHitTesting(false)
+        } else {
+            Map(coordinateRegion: .constant(region), interactionModes: [], annotationItems: overview) { point in
+                MapAnnotation(coordinate: CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude)) {
+                    Circle()
+                        .fill(Color.accentColor)
+                        .frame(width: 8, height: 8)
+                        .overlay(Circle().stroke(.white, lineWidth: 1.5))
+                }
+            }
+            .allowsHitTesting(false)
         }
-        .allowsHitTesting(false) // Garantit que le tap part bien sur le conteneur (open full map)
     }
 
     /// Coordonnée moyenne des points correspondant aux photos tappées.
@@ -231,84 +257,29 @@ public struct PhotoMapView: View {
     }
 
     private var emptyState: some View {
-        emptyStateScaffold(
-            systemImage: "mappin.slash",
-            title: L10n.Map.emptyTitle,
-            subtitle: L10n.Map.emptySubtitle
-        )
+        EmptyStateView(systemImage: "mappin.slash", title: L10n.Map.emptyTitle, subtitle: L10n.Map.emptySubtitle)
     }
 
     private func permissionState(denied: Bool) -> some View {
-        VStack(spacing: 20) {
-            Image(systemName: "photo.on.rectangle.angled")
-                .font(.system(size: 56))
-                .foregroundStyle(.tint)
-
-            VStack(spacing: 8) {
-                Text(L10n.Map.permissionTitle)
-                    .font(.title3.weight(.semibold))
-                    .multilineTextAlignment(.center)
-                Text(denied ? L10n.Map.permissionDeniedSubtitle : L10n.Map.permissionSubtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.horizontal, 32)
-
-            if denied {
-                Button {
-                    if let url = URL(string: UIApplication.openSettingsURLString) {
-                        UIApplication.shared.open(url)
-                    }
-                } label: {
-                    Text(L10n.Map.openSettings)
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(.tint, in: RoundedRectangle(cornerRadius: 10))
-                        .foregroundStyle(.white)
-                }
-                .padding(.horizontal, 40)
-            } else {
-                Button {
+        EmptyStateView(
+            systemImage: "photo.on.rectangle.angled",
+            title: L10n.Map.permissionTitle,
+            subtitle: denied ? L10n.Map.permissionDeniedSubtitle : L10n.Map.permissionSubtitle,
+            actionTitle: denied ? L10n.Map.openSettings : L10n.Map.allowAccess,
+            action: {
+                if denied {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                } else {
                     Task { await viewModel.requestPhotoLibraryAccess() }
-                } label: {
-                    Text(L10n.Map.allowAccess)
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
-                        .background(.tint, in: RoundedRectangle(cornerRadius: 10))
-                        .foregroundStyle(.white)
                 }
-                .padding(.horizontal, 40)
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private func errorState(message: String) -> some View {
-        emptyStateScaffold(
-            systemImage: "exclamationmark.triangle",
-            title: L10n.Common.errorGeneric,
-            subtitle: message
         )
     }
 
-    private func emptyStateScaffold(systemImage: String, title: String, subtitle: String) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: systemImage)
-                .font(.system(size: 52))
-                .foregroundStyle(.secondary)
-            Text(title)
-                .font(.title3.weight(.semibold))
-                .multilineTextAlignment(.center)
-            Text(subtitle)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 32)
+    private func errorState(message: String) -> some View {
+        ErrorStateView(title: L10n.Common.errorGeneric, message: message, retryTitle: L10n.Common.retry) {
+            Task { await viewModel.load() }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -399,7 +370,10 @@ private struct PlaceThumbnailImage: View {
 
     init(photo: PhotoSnapshot) {
         self.photo = photo
-        _loader = StateObject(wrappedValue: ThumbnailLoader(driveId: photo.driveId, fileId: photo.fileId))
+        _loader = StateObject(wrappedValue: ThumbnailLoader(
+            driveId: photo.driveId,
+            fileId: photo.fileId
+        ))
     }
 
     var body: some View {
@@ -414,7 +388,9 @@ private struct PlaceThumbnailImage: View {
                     .foregroundStyle(.secondary)
             }
         }
-        .task { await loader.load() }
+        .task(id: photo.remoteRevision + (photo.thumbnailPack?.sha256 ?? "")) {
+            await loader.load()
+        }
     }
 }
 
@@ -447,34 +423,52 @@ private struct PhotoLocationSheet: View {
     /// Coord précise du tap : si fournie, le sheet déclenche un reverse-geocode
     /// fin (rue + quartier) et remplace `initialTitle` une fois résolu.
     let preciseCoordinate: CLLocationCoordinate2D?
-    let onTap: (Int) -> Void
-
+    @State private var viewerPresentation: ViewerPresentation?
+    @State private var currentFileID: String?
+    @Namespace private var viewerNamespace
     @State private var resolvedTitle: String?
 
     private let columns = [GridItem(.adaptive(minimum: 100, maximum: 140), spacing: 4)]
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 4) {
-                    ForEach(Array(photos.enumerated()), id: \.element.fileId) { index, photo in
-                        Button {
-                            onTap(index)
-                        } label: {
-                            MapSheetThumbnail(photo: photo)
-                                .aspectRatio(1, contentMode: .fit)
+            ScrollViewReader { scrollProxy in
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 4) {
+                        ForEach(Array(photos.enumerated()), id: \.element.fileId) { index, photo in
+                            Button {
+                                currentFileID = nil
+                                viewerPresentation = ViewerPresentation(photos: photos, index: index)
+                            } label: {
+                                MapSheetThumbnail(photo: photo)
+                                    .aspectRatio(1, contentMode: .fit)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+                    .padding(.horizontal, 4)
+                    .padding(.bottom, 16)
                 }
-                .padding(.horizontal, 4)
-                .padding(.bottom, 16)
+                .onChange(of: currentFileID) { fileID in
+                    guard let fileID else { return }
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) { scrollProxy.scrollTo(fileID, anchor: .center) }
+                }
             }
             .navigationTitle(resolvedTitle ?? initialTitle)
             .navigationBarTitleDisplayMode(.inline)
             .task(id: preciseCoordinate.map { "\($0.latitude),\($0.longitude)" } ?? "") {
                 await resolvePreciseAddress()
             }
+        }
+        .fullScreenCover(item: $viewerPresentation) { presentation in
+            FullscreenMediaView(
+                media: presentation.photos.map(ViewerMedia.cloud),
+                initialIndex: presentation.index,
+                namespace: viewerNamespace,
+                onClose: { viewerPresentation = nil }
+            )
         }
     }
 
@@ -507,7 +501,10 @@ private struct MapSheetThumbnail: View {
 
     init(photo: PhotoSnapshot) {
         self.photo = photo
-        _loader = StateObject(wrappedValue: ThumbnailLoader(driveId: photo.driveId, fileId: photo.fileId))
+        _loader = StateObject(wrappedValue: ThumbnailLoader(
+            driveId: photo.driveId,
+            fileId: photo.fileId
+        ))
     }
 
     var body: some View {
@@ -537,7 +534,9 @@ private struct MapSheetThumbnail: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .task { await loader.load() }
+            .task(id: photo.remoteRevision + (photo.thumbnailPack?.sha256 ?? "")) {
+                await loader.load()
+            }
         }
     }
 }

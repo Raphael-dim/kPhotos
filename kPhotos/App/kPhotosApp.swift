@@ -24,6 +24,7 @@ import SwiftUI
 @main
 struct KPhotosApp: App {
     @InjectService private var backgroundScheduler: BackgroundSyncScheduling
+    @InjectService private var libraryPreparation: LibraryPreparationScheduling
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage(AppTheme.storageKey) private var theme: AppTheme = .system
 
@@ -34,16 +35,26 @@ struct KPhotosApp: App {
         // Doit être appelé avant la fin de `application:didFinishLaunchingWithOptions`,
         // sinon `BGTaskScheduler.register` crash. SwiftUI App `init` est exécuté
         // dans cette fenêtre.
-        if !Self.isUnitTestHost { backgroundScheduler.bootstrap() }
+        if !Self.isUnitTestHost {
+            backgroundScheduler.bootstrap()
+            libraryPreparation.bootstrap()
+        }
     }
 
     var body: some Scene {
         WindowGroup {
             if Self.isUnitTestHost {
-                Color.clear
+                Color.clear // Unit tests must not start real cloud work from the host UI.
             } else {
                 RootView()
                     .preferredColorScheme(theme.colorScheme)
+                    .task(id: scenePhase) {
+                        if scenePhase == .active {
+                            await libraryPreparation.activate()
+                        } else if scenePhase == .background {
+                            await libraryPreparation.suspend()
+                        }
+                    }
             }
         }
         // À chaque passage en background, on (re-)soumet les `BGTaskRequest`.

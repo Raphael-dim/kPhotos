@@ -122,7 +122,7 @@ public extension Realm.Configuration {
             // v10: additive capture-date provenance; old dates stay unconfirmed until refreshed.
             // v11: additive optional coordinates and location provenance.
             // v12: original-file metadata cache and revision.
-            config.schemaVersion = 9
+            config.schemaVersion = 14
             config.objectTypes = [
                 Photo.self,
                 Album.self,
@@ -130,7 +130,8 @@ public extension Realm.Configuration {
                 Drive.self,
                 SyncSettings.self,
                 BackupItem.self,
-                DeletionItem.self
+                DeletionItem.self,
+                MetadataReadAttempt.self
             ]
             config.migrationBlock = { _, _ in
                 // No-op : Realm gère automatiquement l'ajout de `BackupItem` / `DeletionItem`

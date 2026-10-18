@@ -105,6 +105,28 @@ final class UploadTransportTests: XCTestCase {
         do { _ = try await task.value; XCTFail("Must cancel") } catch { XCTAssertTrue(error is CancellationError) }
     }
 
+    func testVideoRedirectIsResolvedWithoutSendingTokenToPlayer() async throws {
+        StubKDriveProtocol.rawData = Data() // The real API redirect has no response body.
+        StubKDriveProtocol.statusCode = 302
+        StubKDriveProtocol.headers = ["Location": "https://media.infomaniakusercontent.com/video.mov?signature=test"]
+        StubKDriveProtocol.handler = { request in
+            XCTAssertTrue(request.url!.path.hasSuffix("/download"))
+            return [:]
+        }
+        let url = try await api().playbackURL(driveId: 7, fileId: "123")
+        XCTAssertEqual(url.host, "media.infomaniakusercontent.com")
+        XCTAssertEqual(url.query, "signature=test")
+    }
+
+    func testVideoRedirectRejectsInsecureLocation() async throws {
+        StubKDriveProtocol.statusCode = 302
+        StubKDriveProtocol.headers = ["Location": "http://media.infomaniakusercontent.com/video.mov"]
+        StubKDriveProtocol.handler = { _ in [:] }
+        do { _ = try await api().playbackURL(driveId: 7, fileId: "123"); XCTFail("Must reject") } catch {
+            XCTAssertEqual(error as? PhotoAPIError, .invalidResponse)
+        }
+    }
+
     func testFailedRemoteDeletionIsNotReportedAsSuccessful() async throws {
         StubKDriveProtocol.statusCode = 404
         StubKDriveProtocol.handler = { _ in ["result": "error"] }

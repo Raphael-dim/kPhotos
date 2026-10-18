@@ -19,7 +19,32 @@
 import Foundation
 
 public enum L10n {
+    public enum Places {
+        public static let inProgress = key("places.status.inProgress")
+        public static func progress(_ completed: Int, _ total: Int) -> String {
+            String(format: key("places.status.progress"), completed.formatted(), total.formatted())
+        }
+
+        public static func processedCount(_ completed: Int, _ total: Int) -> String {
+            String(format: key("places.status.processedCount"), completed.formatted(), total.formatted())
+        }
+
+        public static let title = key("places.status.title")
+        public static let checking = key("places.status.checking")
+        public static let running = key("places.status.running")
+        public static let paused = key("places.status.paused")
+        public static let waiting = key("places.status.waiting")
+        public static let attention = key("places.status.attention")
+        public static let complete = key("places.status.complete")
+        public static let completeDetail = key("places.status.completeDetail")
+        public static let help = key("places.status.help")
+        public static let noGPS = key("places.status.noGPS")
+        public static let processed = key("places.status.processed")
+        public static let resume = key("places.status.resume")
+    }
+
     public enum Common {
+        public static let more = key("common.more")
         public static let cancel = key("common.cancel")
         public static let confirm = key("common.confirm")
         public static let delete = key("common.delete")
@@ -226,6 +251,18 @@ public enum L10n {
     }
 
     public enum Map {
+        public static var completePlaces: String { key("map.metadata.complete") }
+        public static func metadataLimited(count: Int) -> String { String(format: key("map.metadata.limited"), count) }
+        public static var metadataHelp: String { key("map.metadata.help") }
+        public static var suspendMetadata: String { key("map.metadata.suspend") }
+        public static func metadataFailures(count: Int) -> String {
+            String(format: key("map.metadata.failures"), count)
+        }
+
+        public static func metadataProgress(completed: Int, total: Int) -> String {
+            String(format: key("map.metadata.progress"), completed, total)
+        }
+
         public static let tabTitle = key("map.tab.title")
         public static let title = key("map.title")
         public static func subtitle(count: Int) -> String {

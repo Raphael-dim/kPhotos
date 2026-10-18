@@ -187,11 +187,11 @@
 
 // Map
 "map.tab.title" = "Carte";
-"map.title" = "Vos photos sur la carte";
+"map.title" = "Carte";
 "map.subtitle" = "%d photo(s) géolocalisée(s)";
 "map.loading" = "Chargement de la carte…";
 "map.empty.title" = "Aucune photo géolocalisée";
-"map.empty.subtitle" = "Les photos prises avec un lieu apparaîtront ici. Sauvegarde d'abord tes photos depuis cet appareil pour qu'elles soient placées sur la carte.";
+"map.empty.subtitle" = "Les photos et vidéos contenant des coordonnées GPS apparaîtront ici au fur et à mesure de la lecture de leurs métadonnées.";
 "map.permission.title" = "Accès à la photothèque requis";
 "map.permission.subtitle" = "kPhotos utilise les coordonnées GPS conservées par iOS pour placer tes photos sur la carte.";
 "map.permission.denied.subtitle" = "Ouvre les Réglages pour autoriser kPhotos à lire les métadonnées de localisation de tes photos.";
@@ -215,3 +215,47 @@
 "common.create" = "Créer";
 
 "signIn.pat.tutorial.page" = "%d / %d";
+
+"map.metadata.progress" = "Préparation des lieux : %d / %d";
+
+"map.metadata.failures" = "Métadonnées non lues pour %d fichier(s).";
+
+"map.metadata.complete" = "Compléter les lieux";
+
+"map.metadata.help" = "Une première analyse de tous les originaux peut prendre plusieurs heures. La galerie reste disponible.";
+
+"map.metadata.suspend" = "Suspendre";
+
+"map.metadata.limited" = "Métadonnées partiellement lues pour %d médias. Leur absence de GPS n’est pas confirmée.";
+
+"common.more" = "Plus d’options";
+
+"places.status.title" = "Préparation des lieux";
+
+"places.status.checking" = "Recherche des lieux";
+
+"places.status.running" = "Préparation des lieux";
+
+"places.status.paused" = "Préparation en pause";
+
+"places.status.waiting" = "Préparation en attente";
+
+"places.status.attention" = "Lieux à compléter";
+
+"places.status.complete" = "Lieux à jour";
+
+"places.status.completeDetail" = "La carte est prête à explorer";
+
+"places.status.help" = "kPhotos lit les lieux dans vos originaux sur le Wi-Fi. Cette préparation ne modifie pas vos fichiers et ne correspond pas à un envoi de sauvegarde.";
+
+"places.status.noGPS" = "Une photo sans position GPS peut être entièrement analysée sans apparaître sur la carte.";
+
+"places.status.processed" = "Éléments analysés";
+
+"places.status.resume" = "Reprendre la préparation";
+
+"places.status.processedCount" = "%@ sur %@";
+
+"places.status.progress" = "%@ sur %@ éléments analysés";
+
+"places.status.inProgress" = "Analyse en cours";

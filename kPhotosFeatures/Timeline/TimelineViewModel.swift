@@ -52,6 +52,8 @@ public final class TimelineViewModel: ObservableObject {
         (try? syncSettings.current().rootFolderName) ?? SyncSettingsSnapshot.defaultRootFolderName
     }
 
+    @InjectService private var preparedIndex: PreparedMediaIndexSyncing
+    @InjectService private var metadataIndexer: EmbeddedMetadataIndexing
     @InjectService private var photos: PhotoReading
     @InjectService private var assetReader: PHAssetReading
     @InjectService private var driveManager: DriveManaging
@@ -102,6 +104,13 @@ public final class TimelineViewModel: ObservableObject {
     public init() {
         bindToUploadQueue()
         bindToLibrarySettings()
+        photos.changesPublisher
+            .debounce(for: .seconds(2), scheduler: DispatchQueue.main)
+            .sink { [weak self] in
+                guard let self, case .ready(let summary, _) = state else { return }
+                self.cloudPhotos = (try? currentLibraryPhotos()) ?? []
+                rebuildState(summary: summary)
+            }.store(in: &cancellables)
     }
 
     private func bindToLibrarySettings() {
@@ -119,6 +128,7 @@ public final class TimelineViewModel: ObservableObject {
                 cloudRefreshError = nil
                 if case .ready(let summary, _) = state { rebuildState(summary: summary) }
                 Task {
+                    await self.metadataIndexer.suspend()
                     await self.refreshCloud()
                     await self.reconcileBackupQueue()
                 }
@@ -161,12 +171,18 @@ public final class TimelineViewModel: ObservableObject {
         //    apparaissent quand le listing kDrive revient.
         Task {
             guard let drive = try? driveManager.selectedDrive(), !drive.rootFolderId.isEmpty else { return }
+            do { try await preparedIndex.refresh(driveId: drive.id, rootId: drive.rootFolderId) } catch {
+            /* Existing gallery remains available; the prepared cache can be retried. */ }
+            cloudPhotos = (try? currentLibraryPhotos()) ?? []
+            if case .ready(let summary, _) = state { rebuildState(summary: summary) }
             if LibraryRefreshSchedule().shouldRefresh(
                 driveId: drive.id,
                 rootId: drive.rootFolderId,
                 hasCache: !cloudPhotos.isEmpty
             ) {
                 await refreshCloud()
+            } else {
+                await metadataIndexer.start(driveId: drive.id, rootId: drive.rootFolderId)
             }
         }
 
@@ -201,6 +217,11 @@ public final class TimelineViewModel: ObservableObject {
             cloudPhotos = try await CloudLibraryRefresh(
                 drives: driveManager, settings: syncSettings, sync: sync, photos: photos
             ).load()
+            if let drive = try driveManager.selectedDrive(), !drive.rootFolderId.isEmpty {
+                do { try await preparedIndex.refresh(driveId: drive.id, rootId: drive.rootFolderId, force: true) } catch {
+                /* Listing remains valid; the optional prepared index can be retried independently. */ }
+                await metadataIndexer.start(driveId: drive.id, rootId: drive.rootFolderId)
+            }
             cloudRefreshError = nil
             if case .ready(let summary, _) = state {
                 rebuildState(summary: summary)
