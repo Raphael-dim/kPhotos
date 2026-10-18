@@ -20,38 +20,38 @@
 import XCTest
 
 final class AuthConfigTests: XCTestCase {
-    func testInfomaniakDefault_endpointsAndSchemeAreCorrect() {
+    func testInfomaniakDefault_endpointsAndSchemeAreCorrect() throws {
         let config = AuthConfig.infomaniak
         XCTAssertEqual(config.callbackScheme, "app.kphotos")
         XCTAssertEqual(config.authorizationEndpoint.host, "login.infomaniak.com")
         XCTAssertEqual(config.tokenEndpoint.host, "login.infomaniak.com")
     }
 
-    func testInfomaniakDefault_isNotConfiguredOutOfTheBox() {
+    func testInfomaniakDefault_isNotConfiguredOutOfTheBox() throws {
         // The shipped client_id is a placeholder; the OAuth flow must be
         // explicitly configured by the user before it can be enabled.
         XCTAssertFalse(AuthConfig.infomaniak.isConfigured)
     }
 
-    func testIsConfigured_falseWhenClientIdIsPlaceholder() {
-        XCTAssertFalse(makeConfig(clientId: "REPLACE_ME_WITH_REAL_ID").isConfigured)
+    func testIsConfigured_falseWhenClientIdIsPlaceholder() throws {
+        XCTAssertFalse(try makeConfig(clientId: "REPLACE_ME_WITH_REAL_ID").isConfigured)
     }
 
-    func testIsConfigured_falseWhenClientIdIsEmpty() {
-        XCTAssertFalse(makeConfig(clientId: "").isConfigured)
+    func testIsConfigured_falseWhenClientIdIsEmpty() throws {
+        XCTAssertFalse(try makeConfig(clientId: "").isConfigured)
     }
 
-    func testIsConfigured_trueForRealClientId() {
-        XCTAssertTrue(makeConfig(clientId: "00000000-0000-4000-8000-000000000000").isConfigured)
+    func testIsConfigured_trueForRealClientId() throws {
+        XCTAssertTrue(try makeConfig(clientId: "00000000-0000-4000-8000-000000000000").isConfigured)
     }
 
-    private func makeConfig(clientId: String) -> AuthConfig {
-        AuthConfig(
+    private func makeConfig(clientId: String) throws -> AuthConfig {
+        try AuthConfig(
             clientId: clientId,
-            redirectURI: URL(string: "app.kphotos://oauth/callback")!,
+            redirectURI: XCTUnwrap(URL(string: "app.kphotos://oauth/callback")),
             callbackScheme: "app.kphotos",
-            authorizationEndpoint: URL(string: "https://login.infomaniak.com/authorize")!,
-            tokenEndpoint: URL(string: "https://login.infomaniak.com/token")!
+            authorizationEndpoint: XCTUnwrap(URL(string: "https://login.infomaniak.com/authorize")),
+            tokenEndpoint: XCTUnwrap(URL(string: "https://login.infomaniak.com/token"))
         )
     }
 }

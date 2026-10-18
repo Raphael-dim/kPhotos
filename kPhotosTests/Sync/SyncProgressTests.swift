@@ -20,11 +20,11 @@
 import XCTest
 
 final class SyncProgressTests: XCTestCase {
-    func testFraction_zeroTotal_isZero_noDivisionByZero() {
+    func testFraction_zeroTotal_isZero_noDivisionByZero() throws {
         XCTAssertEqual(SyncProgress(completed: 0, total: 0, lastUploadedFileName: nil).fraction, 0)
     }
 
-    func testFraction_halfway() {
+    func testFraction_halfway() throws {
         XCTAssertEqual(
             SyncProgress(completed: 5, total: 10, lastUploadedFileName: nil).fraction,
             0.5,
@@ -32,7 +32,7 @@ final class SyncProgressTests: XCTestCase {
         )
     }
 
-    func testFraction_complete() {
+    func testFraction_complete() throws {
         XCTAssertEqual(
             SyncProgress(completed: 10, total: 10, lastUploadedFileName: nil).fraction,
             1.0,
@@ -40,7 +40,7 @@ final class SyncProgressTests: XCTestCase {
         )
     }
 
-    func testFractionCountsProcessedFailuresWithoutCountingThemAsUploads() {
+    func testFractionCountsProcessedFailuresWithoutCountingThemAsUploads() throws {
         let progress = SyncProgress(completed: 0, total: 10, lastUploadedFileName: nil, processed: 5)
         XCTAssertEqual(progress.fraction, 0.5, accuracy: 0.001)
         XCTAssertEqual(progress.completed, 0)
@@ -48,36 +48,36 @@ final class SyncProgressTests: XCTestCase {
 }
 
 final class SyncPolicyErrorTests: XCTestCase {
-    func testNetworkNotAllowed_offline_mentionsNoConnection() {
+    func testNetworkNotAllowed_offline_mentionsNoConnection() throws {
         let error = SyncPolicyError.networkNotAllowed(current: .offline, policy: .wifiOnly)
         XCTAssertEqual(error.errorDescription, "Aucune connexion réseau.")
     }
 
-    func testNetworkNotAllowed_cellular_mentionsCellular() {
+    func testNetworkNotAllowed_cellular_mentionsCellular() throws {
         let error = SyncPolicyError.networkNotAllowed(current: .cellular, policy: .wifiOnly)
-        XCTAssertTrue(error.errorDescription!.lowercased().contains("cellulaire"))
+        XCTAssertTrue(try (XCTUnwrap(error.errorDescription)).lowercased().contains("cellulaire"))
     }
 
-    func testNetworkNotAllowed_wifi_mentionsWifi() {
+    func testNetworkNotAllowed_wifi_mentionsWifi() throws {
         let error = SyncPolicyError.networkNotAllowed(current: .wifi, policy: [])
-        XCTAssertTrue(error.errorDescription!.contains("Wi-Fi"))
+        XCTAssertTrue(try (XCTUnwrap(error.errorDescription)).contains("Wi-Fi"))
     }
 
-    func testNothingToSync_hasMessage() {
+    func testNothingToSync_hasMessage() throws {
         XCTAssertEqual(SyncPolicyError.nothingToSync.errorDescription, "Aucune photo à synchroniser.")
     }
 }
 
 /// `PhotoSyncEngine.userFacingReason` traduit l'erreur d'upload en message FR.
 final class PhotoSyncEngineErrorTests: XCTestCase {
-    func testUserFacingReason_exportError_usesLocalizedDescription() {
+    func testUserFacingReason_exportError_usesLocalizedDescription() throws {
         XCTAssertEqual(
             PhotoSyncEngine.userFacingReason(from: ExportError.noResource),
             ExportError.noResource.errorDescription
         )
     }
 
-    func testUserFacingReason_apiError_usesLocalizedDescription() {
+    func testUserFacingReason_apiError_usesLocalizedDescription() throws {
         XCTAssertEqual(
             PhotoSyncEngine.userFacingReason(from: PhotoAPIError.unauthorized),
             PhotoAPIError.unauthorized.errorDescription

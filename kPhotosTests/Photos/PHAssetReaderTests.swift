@@ -41,11 +41,11 @@ final class PhotoLibrarySummaryTests: XCTestCase {
 
 final class AssetLocationTests: XCTestCase {
     func testEquatableAndHashable() {
-        let a = AssetLocation(localIdentifier: "L1", latitude: 46.2, longitude: 6.1)
-        let b = AssetLocation(localIdentifier: "L1", latitude: 46.2, longitude: 6.1)
-        let c = AssetLocation(localIdentifier: "L2", latitude: 46.2, longitude: 6.1)
-        XCTAssertEqual(a, b)
-        XCTAssertNotEqual(a, c)
-        XCTAssertEqual(Set([a, b]).count, 1)
+        let first = AssetLocation(localIdentifier: "L1", latitude: 46.2, longitude: 6.1)
+        let same = AssetLocation(localIdentifier: "L1", latitude: 46.2, longitude: 6.1)
+        let different = AssetLocation(localIdentifier: "L2", latitude: 46.2, longitude: 6.1)
+        XCTAssertEqual(first, same)
+        XCTAssertNotEqual(first, different)
+        XCTAssertEqual(Set([first, same]).count, 1)
     }
 }

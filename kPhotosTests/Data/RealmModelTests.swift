@@ -24,20 +24,20 @@ import XCTest
 /// thread-safe. On vérifie surtout les propriétés calculées enum↔raw et le
 /// passage entité → snapshot (cf. AGENTS.md §21 Realm thread-safety).
 final class PhotoModelTests: XCTestCase {
-    func testSyncStatus_roundTripsThroughRawValue() {
+    func testSyncStatus_roundTripsThroughRawValue() throws {
         let photo = Photo()
         photo.syncStatus = .uploading
         XCTAssertEqual(photo.syncStatusRaw, "uploading")
         XCTAssertEqual(photo.syncStatus, .uploading)
     }
 
-    func testSyncStatus_invalidRaw_mapsToError() {
+    func testSyncStatus_invalidRaw_mapsToError() throws {
         let photo = Photo()
         photo.syncStatusRaw = "garbage"
         XCTAssertEqual(photo.syncStatus, .error)
     }
 
-    func testSnapshot_fromEntity_copiesFields() {
+    func testSnapshot_fromEntity_copiesFields() throws {
         let photo = Photo()
         photo.fileId = "F1"
         photo.driveId = 9
@@ -92,20 +92,20 @@ final class PhotoModelTests: XCTestCase {
 }
 
 final class BackupItemModelTests: XCTestCase {
-    func testState_roundTripsThroughRawValue() {
+    func testState_roundTripsThroughRawValue() throws {
         let item = BackupItem()
         item.state = .failedTransient
         XCTAssertEqual(item.stateRaw, "failedTransient")
         XCTAssertEqual(item.state, .failedTransient)
     }
 
-    func testState_invalidRaw_fallsBackToQueued() {
+    func testState_invalidRaw_fallsBackToQueued() throws {
         let item = BackupItem()
         item.stateRaw = "???"
         XCTAssertEqual(item.state, .queued)
     }
 
-    func testSnapshot_fromEntity_copiesFields() {
+    func testSnapshot_fromEntity_copiesFields() throws {
         let item = BackupItem()
         item.localIdentifier = "L1"
         item.state = .uploading
@@ -125,20 +125,20 @@ final class BackupItemModelTests: XCTestCase {
 }
 
 final class DeletionItemModelTests: XCTestCase {
-    func testState_roundTripsThroughRawValue() {
+    func testState_roundTripsThroughRawValue() throws {
         let item = DeletionItem()
         item.state = .deleting
         XCTAssertEqual(item.stateRaw, "deleting")
         XCTAssertEqual(item.state, .deleting)
     }
 
-    func testState_invalidRaw_fallsBackToQueued() {
+    func testState_invalidRaw_fallsBackToQueued() throws {
         let item = DeletionItem()
         item.stateRaw = "nope"
         XCTAssertEqual(item.state, .queued)
     }
 
-    func testSnapshot_fromEntity_copiesFields() {
+    func testSnapshot_fromEntity_copiesFields() throws {
         let item = DeletionItem()
         item.fileId = "F1"
         item.driveId = 7
@@ -156,7 +156,7 @@ final class DeletionItemModelTests: XCTestCase {
 }
 
 final class DriveModelTests: XCTestCase {
-    func testSnapshot_fromEntity_copiesFields() {
+    func testSnapshot_fromEntity_copiesFields() throws {
         let drive = Drive()
         drive.id = 3
         drive.name = "Perso"
@@ -176,7 +176,7 @@ final class DriveModelTests: XCTestCase {
 }
 
 final class AlbumModelTests: XCTestCase {
-    func testSnapshot_fromEntity_copiesFields() {
+    func testSnapshot_fromEntity_copiesFields() throws {
         let album = Album()
         album.id = "cat-1"
         album.driveId = 4
@@ -196,27 +196,27 @@ final class AlbumModelTests: XCTestCase {
 }
 
 final class SyncSettingsModelTests: XCTestCase {
-    func testNetworkPolicy_computedProperty_packsAndUnpacks() {
+    func testNetworkPolicy_computedProperty_packsAndUnpacks() throws {
         let entity = SyncSettings()
         entity.networkPolicy = .unrestricted
         XCTAssertEqual(entity.networkPolicyRaw, SyncNetworkPolicy.unrestricted.rawValue)
         XCTAssertEqual(entity.networkPolicy, .unrestricted)
     }
 
-    func testMediaFilter_computedProperty_packsAndUnpacks() {
+    func testMediaFilter_computedProperty_packsAndUnpacks() throws {
         let entity = SyncSettings()
         entity.mediaFilter = .photosOnly
         XCTAssertEqual(entity.mediaFilterRaw, SyncMediaFilter.photosOnly.rawValue)
         XCTAssertEqual(entity.mediaFilter, .photosOnly)
     }
 
-    func testSnapshot_fromEntity_trimsRootFolderName() {
+    func testSnapshot_fromEntity_trimsRootFolderName() throws {
         let entity = SyncSettings()
         entity.rootFolderName = "  Mes Photos  "
         XCTAssertEqual(SyncSettingsSnapshot(entity).rootFolderName, "Mes Photos")
     }
 
-    func testSnapshot_fromEntity_blankRootFolder_fallsBackToDefault() {
+    func testSnapshot_fromEntity_blankRootFolder_fallsBackToDefault() throws {
         let entity = SyncSettings()
         entity.rootFolderName = "   "
         XCTAssertEqual(
@@ -225,7 +225,7 @@ final class SyncSettingsModelTests: XCTestCase {
         )
     }
 
-    func testSnapshot_fromEntity_copiesToggleAndPolicy() {
+    func testSnapshot_fromEntity_copiesToggleAndPolicy() throws {
         let entity = SyncSettings()
         entity.isAutoSyncEnabled = true
         entity.networkPolicy = .unrestricted
@@ -267,7 +267,7 @@ final class LegacyRealmEncryptionTests: XCTestCase {
             settings.rootFolderName = "Photos & Vidéos"
             try realm.write { realm.add([drive, photo, album, pending, settings]) }
         }
-        let original = try Data(contentsOf: config.fileURL!)
+        let original = try Data(contentsOf: XCTUnwrap(config.fileURL))
         config.encryptionKey = Data(repeating: 17, count: 64)
         try LegacyRealmEncryption.prepare(config)
         let backups = try FileManager.default.contentsOfDirectory(
@@ -286,9 +286,9 @@ final class LegacyRealmEncryptionTests: XCTestCase {
             XCTAssertEqual(realm.objects(BackupItem.self).first?.state, .failedTransient)
             XCTAssertEqual(realm.objects(SyncSettings.self).first?.rootFolderName, "Photos & Vidéos")
         }
-        let encrypted = try Data(contentsOf: config.fileURL!)
+        let encrypted = try Data(contentsOf: XCTUnwrap(config.fileURL))
         try LegacyRealmEncryption.prepare(config)
-        XCTAssertEqual(try Data(contentsOf: config.fileURL!), encrypted)
+        XCTAssertEqual(try Data(contentsOf: XCTUnwrap(config.fileURL)), encrypted)
     }
 
     func testUnknownEncryptedKeyNeverReplacesTheDatabase() throws {
@@ -300,10 +300,10 @@ final class LegacyRealmEncryptionTests: XCTestCase {
             objectTypes: [Drive.self]
         )
         try autoreleasepool { _ = try Realm(configuration: config) }
-        let original = try Data(contentsOf: config.fileURL!)
+        let original = try Data(contentsOf: XCTUnwrap(config.fileURL))
         config.encryptionKey = Data(repeating: 19, count: 64)
         try LegacyRealmEncryption.prepare(config)
-        XCTAssertEqual(try Data(contentsOf: config.fileURL!), original)
+        XCTAssertEqual(try Data(contentsOf: XCTUnwrap(config.fileURL)), original)
         XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent("DiagnosticBackups").path))
     }
 

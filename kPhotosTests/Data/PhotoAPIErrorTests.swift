@@ -20,7 +20,7 @@
 import XCTest
 
 final class PhotoAPIErrorTests: XCTestCase {
-    func testEveryCase_hasNonEmptyDescription() {
+    func testEveryCase_hasNonEmptyDescription() throws {
         let cases: [PhotoAPIError] = [
             .unauthorized,
             .rateLimited(retryAfter: 30),
@@ -36,12 +36,12 @@ final class PhotoAPIErrorTests: XCTestCase {
         }
     }
 
-    func testRateLimited_withRetryAfter_mentionsSeconds() {
-        XCTAssertTrue(PhotoAPIError.rateLimited(retryAfter: 45).errorDescription!.contains("45"))
+    func testRateLimited_withRetryAfter_mentionsSeconds() throws {
+        XCTAssertTrue(try (XCTUnwrap(PhotoAPIError.rateLimited(retryAfter: 45).errorDescription)).contains("45"))
     }
 
-    func testServer_mentionsStatusCodeAndMessage() {
-        let description = PhotoAPIError.server(statusCode: 503, message: "maintenance").errorDescription!
+    func testServer_mentionsStatusCodeAndMessage() throws {
+        let description = try (XCTUnwrap(PhotoAPIError.server(statusCode: 503, message: "maintenance").errorDescription))
         XCTAssertTrue(description.contains("503"))
         XCTAssertTrue(description.contains("maintenance"))
     }
@@ -50,14 +50,14 @@ final class PhotoAPIErrorTests: XCTestCase {
 /// `PhotoApiFetcher.isRetryable` décide quelles erreurs déclenchent un retry
 /// automatique (réseau / 429 / 5xx). Une 4xx ne doit jamais être rejouée.
 final class PhotoApiFetcherRetryTests: XCTestCase {
-    func testRetryable_networkRateLimitedAnd5xx() {
+    func testRetryable_networkRateLimitedAnd5xx() throws {
         XCTAssertTrue(PhotoApiFetcher.isRetryable(PhotoAPIError.network(underlying: "x")))
         XCTAssertTrue(PhotoApiFetcher.isRetryable(PhotoAPIError.rateLimited(retryAfter: nil)))
         XCTAssertTrue(PhotoApiFetcher.isRetryable(PhotoAPIError.server(statusCode: 500, message: nil)))
         XCTAssertTrue(PhotoApiFetcher.isRetryable(PhotoAPIError.server(statusCode: 599, message: nil)))
     }
 
-    func testNotRetryable_4xxAndDecodingAndUnknown() {
+    func testNotRetryable_4xxAndDecodingAndUnknown() throws {
         XCTAssertFalse(PhotoApiFetcher.isRetryable(PhotoAPIError.unauthorized))
         XCTAssertFalse(PhotoApiFetcher.isRetryable(PhotoAPIError.notFound))
         XCTAssertFalse(PhotoApiFetcher.isRetryable(PhotoAPIError.server(statusCode: 400, message: nil)))
@@ -68,7 +68,7 @@ final class PhotoApiFetcherRetryTests: XCTestCase {
 }
 
 final class UploadErrorTests: XCTestCase {
-    func testEveryCase_hasNonEmptyDescription() {
+    func testEveryCase_hasNonEmptyDescription() throws {
         let cases: [UploadError] = [
             .missingCreationDate,
             .fileNotReadable(path: "/tmp/x"),
@@ -81,13 +81,13 @@ final class UploadErrorTests: XCTestCase {
         }
     }
 
-    func testChunkFailed_mentionsIndex() {
-        XCTAssertTrue(UploadError.chunkFailed(index: 7, underlying: "io").errorDescription!.contains("7"))
+    func testChunkFailed_mentionsIndex() throws {
+        XCTAssertTrue(try (XCTUnwrap(UploadError.chunkFailed(index: 7, underlying: "io").errorDescription)).contains("7"))
     }
 }
 
 final class SyncErrorTests: XCTestCase {
-    func testEveryCase_hasNonEmptyDescription() {
+    func testEveryCase_hasNonEmptyDescription() throws {
         let cases: [SyncError] = [.noPhotoLibraryAccess, .checkpointCorrupted, .backgroundBudgetExhausted]
         for error in cases {
             XCTAssertFalse((error.errorDescription ?? "").isEmpty, "\(error) doit exposer un message")

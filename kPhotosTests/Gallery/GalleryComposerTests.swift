@@ -306,7 +306,9 @@ final class GalleryComposerTests: XCTestCase {
 
         XCTAssertEqual(sections[0].items.count, 1)
     }
+}
 
+extension GalleryComposerTests {
     func testUnverifiedCloudFileAndCompletedQueueDoNotClaimCompleteBackup() {
         let asset = LocalAssetSnapshot(localIdentifier: "L", takenAt: date("2024-06-15"), isVideo: false)
         var cloud = photo(fileId: "F", localId: "L", date: asset.takenAt)
@@ -337,9 +339,9 @@ final class GalleryComposerTests: XCTestCase {
     // MARK: - Helpers
 
     private func date(_ iso: String) -> Date {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withFullDate]
-        return f.date(from: iso) ?? Date()
+        let filter = ISO8601DateFormatter()
+        filter.formatOptions = [.withFullDate]
+        return filter.date(from: iso) ?? Date()
     }
 
     private func photo(

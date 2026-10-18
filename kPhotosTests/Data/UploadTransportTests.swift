@@ -38,7 +38,7 @@ final class UploadTransportTests: XCTestCase {
         var finishes = 0
         StubKDriveProtocol.handler = { request in
             XCTAssertEqual(request.httpMethod, "POST")
-            let path = request.url!.path
+            let path = try (XCTUnwrap(request.url)).path
             if path.hasSuffix("/start") {
                 starts += 1
                 let body = try Self.jsonBody(request)
@@ -49,9 +49,12 @@ final class UploadTransportTests: XCTestCase {
                 return Self.startResponse()
             }
             if path.hasSuffix("/chunk") {
-                let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems!
+                let query = try (XCTUnwrap(XCTUnwrap(URLComponents(
+                    url: XCTUnwrap(request.url),
+                    resolvingAgainstBaseURL: false
+                )).queryItems))
                 let params = Dictionary(uniqueKeysWithValues: query.map { ($0.name, $0.value ?? "") })
-                let number = Int(params["chunk_number"]!)!
+                let number = try (XCTUnwrap(Int(XCTUnwrap(params["chunk_number"]))))
                 let data = try Self.body(request)
                 XCTAssertEqual(data.count, number == 1 ? PhotoApiFetcher.chunkSize : 7)
                 XCTAssertEqual(params["chunk_size"], String(data.count))
@@ -90,7 +93,7 @@ final class UploadTransportTests: XCTestCase {
         try ChunkSessionStorage.save(
             ChunkUploadSession(
                 token: "session",
-                uploadURL: URL(string: "https://upload.infomaniak.com")!,
+                uploadURL: XCTUnwrap(URL(string: "https://upload.infomaniak.com")),
                 startedAt: Date(),
                 nextChunk: 2
             ),
@@ -98,10 +101,13 @@ final class UploadTransportTests: XCTestCase {
         )
         var chunks = 0
         StubKDriveProtocol.handler = { request in
-            XCTAssertFalse(request.url!.path.hasSuffix("/start"), "A live session must be resumed")
-            if request.url!.path.hasSuffix("/chunk") {
+            XCTAssertFalse(try (XCTUnwrap(request.url)).path.hasSuffix("/start"), "A live session must be resumed")
+            if try (XCTUnwrap(request.url)).path.hasSuffix("/chunk") {
                 chunks += 1
-                let params = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems!
+                let params = try (XCTUnwrap(XCTUnwrap(URLComponents(
+                    url: XCTUnwrap(request.url),
+                    resolvingAgainstBaseURL: false
+                )).queryItems))
                 XCTAssertEqual(params.first { $0.name == "chunk_number" }?.value, "2")
                 XCTAssertEqual(try Self.body(request).count, 7)
                 return ["result": "success", "data": ["result": true]]
@@ -125,8 +131,8 @@ final class UploadTransportTests: XCTestCase {
         let fixture = try UploadFixture(size: 7)
         defer { fixture.cleanup() }
         StubKDriveProtocol.handler = { request in
-            if request.url!.path.hasSuffix("/start") { return Self.startResponse() }
-            if request.url!.path.hasSuffix("/chunk") { return ["result": "success", "data": ["result": true]] }
+            if try (XCTUnwrap(request.url)).path.hasSuffix("/start") { return Self.startResponse() }
+            if try (XCTUnwrap(request.url)).path.hasSuffix("/chunk") { return ["result": "success", "data": ["result": true]] }
             return ["result": "success", "data": ["result": false]]
         }
         do {
@@ -224,7 +230,7 @@ final class UploadTransportTests: XCTestCase {
         StubKDriveProtocol.statusCode = 302
         StubKDriveProtocol.headers = ["Location": "https://media.infomaniakusercontent.com/video.mov?signature=test"]
         StubKDriveProtocol.handler = { request in
-            XCTAssertTrue(request.url!.path.hasSuffix("/download"))
+            XCTAssertTrue(try (XCTUnwrap(request.url)).path.hasSuffix("/download"))
             return [:]
         }
         let url = try await api().playbackURL(driveId: 7, fileId: "123")
@@ -312,12 +318,12 @@ private final class StubKDriveProtocol: URLProtocol {
             let handler = try XCTUnwrap(Self.handler)
             let body = try handler(request)
             let data = try Self.rawData ?? JSONSerialization.data(withJSONObject: body)
-            let response = HTTPURLResponse(
-                url: request.url!,
+            let response = try (XCTUnwrap(HTTPURLResponse(
+                url: XCTUnwrap(request.url),
                 statusCode: Self.statusCode,
                 httpVersion: nil,
                 headerFields: Self.headers
-            )!
+            )))
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: data)
             client?.urlProtocolDidFinishLoading(self)

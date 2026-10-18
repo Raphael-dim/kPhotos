@@ -22,33 +22,33 @@ import XCTest
 /// Helpers purs de l'export PhotoKit : prédicat de fetch, nom de fichier
 /// déterministe, mapping UTI → mime/extension. Pas d'accès PhotoKit réel.
 final class PHAssetExporterTests: XCTestCase {
-    func testPredicate_photosOnly_matchesImageMediaType() {
+    func testPredicate_photosOnly_matchesImageMediaType() throws {
         XCTAssertEqual(
             PHAssetExporterImpl.predicate(for: .photosOnly)?.predicateFormat,
             "mediaType == 1"
         )
     }
 
-    func testPredicate_videosOnly_matchesVideoMediaType() {
+    func testPredicate_videosOnly_matchesVideoMediaType() throws {
         XCTAssertEqual(
             PHAssetExporterImpl.predicate(for: .videosOnly)?.predicateFormat,
             "mediaType == 2"
         )
     }
 
-    func testPredicate_both_orsImageAndVideo() {
+    func testPredicate_both_orsImageAndVideo() throws {
         let format = PHAssetExporterImpl.predicate(for: .both)?.predicateFormat ?? ""
         XCTAssertTrue(format.contains("mediaType == 1"))
         XCTAssertTrue(format.contains("mediaType == 2"))
         XCTAssertTrue(format.contains("OR"))
     }
 
-    func testPredicate_emptyFilter_matchesNothing() {
+    func testPredicate_emptyFilter_matchesNothing() throws {
         // OptionSet vide → on ne synchronise rien.
         XCTAssertEqual(PHAssetExporterImpl.predicate(for: [])?.predicateFormat, "FALSEPREDICATE")
     }
 
-    func testMakeFileName_standardUUID_isRecoverable() {
+    func testMakeFileName_standardUUID_isRecoverable() throws {
         // `20200101_000000_<id>.<ext>` — doit être réversible par
         // `PhotoManagerImpl.recoverLocalIdentifier`.
         let date = Date(timeIntervalSince1970: 1_577_836_800) // 2020-01-01 00:00:00 UTC
@@ -65,7 +65,7 @@ final class PHAssetExporterTests: XCTestCase {
         )
     }
 
-    func testMakeFileName_emptyOriginalFilename_derivesExtensionFromUTI() {
+    func testMakeFileName_emptyOriginalFilename_derivesExtensionFromUTI() throws {
         let name = PHAssetExporterImpl.makeFileName(
             creationDate: Date(timeIntervalSince1970: 1_577_836_800),
             localIdentifier: "ABC",
@@ -75,7 +75,7 @@ final class PHAssetExporterTests: XCTestCase {
         XCTAssertTrue(name.hasSuffix(".heic"))
     }
 
-    func testMimeType_knownUTIs() {
+    func testMimeType_knownUTIs() throws {
         XCTAssertEqual(PHAssetExporterImpl.mimeType(from: "public.jpeg"), "image/jpeg")
         XCTAssertEqual(PHAssetExporterImpl.mimeType(from: "public.png"), "image/png")
         XCTAssertEqual(PHAssetExporterImpl.mimeType(from: "public.heic"), "image/heic")
@@ -83,11 +83,11 @@ final class PHAssetExporterTests: XCTestCase {
         XCTAssertEqual(PHAssetExporterImpl.mimeType(from: "public.mpeg-4"), "video/mp4")
     }
 
-    func testMimeType_unknownUTI_fallsBackToOctetStream() {
+    func testMimeType_unknownUTI_fallsBackToOctetStream() throws {
         XCTAssertEqual(PHAssetExporterImpl.mimeType(from: "public.unknown"), "application/octet-stream")
     }
 
-    func testFileExtension_knownUTIs() {
+    func testFileExtension_knownUTIs() throws {
         XCTAssertEqual(PHAssetExporterImpl.fileExtension(from: "public.jpeg"), "jpg")
         XCTAssertEqual(PHAssetExporterImpl.fileExtension(from: "public.png"), "png")
         XCTAssertEqual(PHAssetExporterImpl.fileExtension(from: "public.heic"), "heic")
@@ -95,20 +95,20 @@ final class PHAssetExporterTests: XCTestCase {
         XCTAssertEqual(PHAssetExporterImpl.fileExtension(from: "public.mpeg-4"), "mp4")
     }
 
-    func testFileExtension_unknownUTI_fallsBackToDat() {
+    func testFileExtension_unknownUTI_fallsBackToDat() throws {
         XCTAssertEqual(PHAssetExporterImpl.fileExtension(from: "public.unknown"), "dat")
     }
 }
 
 final class ExportErrorTests: XCTestCase {
-    func testEveryCase_hasNonEmptyDescription() {
+    func testEveryCase_hasNonEmptyDescription() throws {
         let cases: [ExportError] = [.noResource, .missingCreationDate, .writeFailed("io error")]
         for error in cases {
             XCTAssertFalse((error.errorDescription ?? "").isEmpty, "\(error) doit exposer un message")
         }
     }
 
-    func testWriteFailed_includesDetail() {
-        XCTAssertTrue(ExportError.writeFailed("iCloud timeout").errorDescription!.contains("iCloud timeout"))
+    func testWriteFailed_includesDetail() throws {
+        XCTAssertTrue(try (XCTUnwrap(ExportError.writeFailed("iCloud timeout").errorDescription)).contains("iCloud timeout"))
     }
 }

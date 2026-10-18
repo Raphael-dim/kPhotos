@@ -31,7 +31,7 @@ final class MediaIndexPublisherTests: XCTestCase {
             photo.name = "image.jpg"; photo.mimeType = "image/jpeg"; photo.remoteRevision = "v1"
             photo.embeddedMetadataRevision = "v1"
             var metadata = EmbeddedMediaMetadata(); metadata.partialRead = false; metadata.readerVersion = 2
-            photo.embeddedMetadataJSON = try String(decoding: JSONEncoder().encode(metadata), as: UTF8.self)
+            photo.embeddedMetadataJSON = try XCTUnwrap(String(data: JSONEncoder().encode(metadata), encoding: .utf8))
             realm.add(photo)
         }
         let reader = PhotoManagerImpl(realm: RealmAccessorImpl(configuration: config))

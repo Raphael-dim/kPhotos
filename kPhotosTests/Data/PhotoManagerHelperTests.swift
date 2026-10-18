@@ -75,21 +75,21 @@ final class PhotoManagerHelperTests: XCTestCase {
 /// Pas d'interaction PhotoKit (le NSPredicate est statique, testable comme du texte).
 final class PhotoLibraryObserverHelperTests: XCTestCase {
     func testPredicate_photosOnly_matchesImageMediaType() {
-        let p = PhotoLibraryObserverImpl.predicate(for: .photosOnly)
-        XCTAssertEqual(p.predicateFormat, "mediaType == 1")
+        let predicate = PhotoLibraryObserverImpl.predicate(for: .photosOnly)
+        XCTAssertEqual(predicate.predicateFormat, "mediaType == 1")
     }
 
     func testPredicate_videosOnly_matchesVideoMediaType() {
-        let p = PhotoLibraryObserverImpl.predicate(for: .videosOnly)
-        XCTAssertEqual(p.predicateFormat, "mediaType == 2")
+        let predicate = PhotoLibraryObserverImpl.predicate(for: .videosOnly)
+        XCTAssertEqual(predicate.predicateFormat, "mediaType == 2")
     }
 
     func testPredicate_both_orsImageAndVideo() {
-        let p = PhotoLibraryObserverImpl.predicate(for: .both)
+        let predicate = PhotoLibraryObserverImpl.predicate(for: .both)
         // L'ordre des opérandes peut varier selon NSPredicate — on vérifie les
         // deux constantes présentes plutôt qu'une chaîne exacte fragile.
-        XCTAssertTrue(p.predicateFormat.contains("mediaType == 1"))
-        XCTAssertTrue(p.predicateFormat.contains("mediaType == 2"))
-        XCTAssertTrue(p.predicateFormat.contains("OR"))
+        XCTAssertTrue(predicate.predicateFormat.contains("mediaType == 1"))
+        XCTAssertTrue(predicate.predicateFormat.contains("mediaType == 2"))
+        XCTAssertTrue(predicate.predicateFormat.contains("OR"))
     }
 }

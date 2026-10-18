@@ -77,7 +77,7 @@ final class GalleryPerformanceTests: XCTestCase {
     }
 
     @MainActor
-    func testThumbnailRevisionGetsADifferentCacheKey() {
+    func testThumbnailRevisionGetsADifferentCacheKey() throws {
         let old = ThumbnailLoader.cacheKey(driveId: 7, fileId: "id", revision: "old")
         let new = ThumbnailLoader.cacheKey(driveId: 7, fileId: "id", revision: "new")
         XCTAssertNotEqual(old, new)

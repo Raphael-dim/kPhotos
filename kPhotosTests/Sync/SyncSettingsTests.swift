@@ -44,19 +44,19 @@ final class SyncSettingsTests: XCTestCase {
     }
 
     func testReachability_allowsSync_respectsPolicy() {
-        let r = FakeReachability()
+        let realm = FakeReachability()
 
-        r.kind = .wifi
-        XCTAssertTrue(r.allowsSync(under: .wifiOnly))
-        XCTAssertTrue(r.allowsSync(under: .unrestricted))
+        realm.kind = .wifi
+        XCTAssertTrue(realm.allowsSync(under: .wifiOnly))
+        XCTAssertTrue(realm.allowsSync(under: .unrestricted))
 
-        r.kind = .cellular
-        XCTAssertFalse(r.allowsSync(under: .wifiOnly))
-        XCTAssertTrue(r.allowsSync(under: .unrestricted))
-        XCTAssertTrue(r.allowsSync(under: [.cellular]))
+        realm.kind = .cellular
+        XCTAssertFalse(realm.allowsSync(under: .wifiOnly))
+        XCTAssertTrue(realm.allowsSync(under: .unrestricted))
+        XCTAssertTrue(realm.allowsSync(under: [.cellular]))
 
-        r.kind = .offline
-        XCTAssertFalse(r.allowsSync(under: .unrestricted))
+        realm.kind = .offline
+        XCTAssertFalse(realm.allowsSync(under: .unrestricted))
     }
 }
 

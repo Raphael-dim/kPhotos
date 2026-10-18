@@ -47,7 +47,7 @@ final class MediaLibraryIndexTests: XCTestCase {
         ))
     }
 
-    func testMalformedCountersAndDuplicateRecordsCannotBecomeAnIndex() {
+    func testMalformedCountersAndDuplicateRecordsCannotBecomeAnIndex() throws {
         let record = MediaIndexRecord(fileId: "10", revision: "rev", metadata: .init())
         let duplicate = MediaLibraryIndex(
             driveId: 7,
@@ -145,16 +145,18 @@ final class MediaLibraryIndexTests: XCTestCase {
             failed: 0,
             records: []
         ).encode()) as? [String: Any])
-        json["catalogue"] = [[
-            "fileId": "10",
-            "revision": dto.revision,
-            "name": "archive.zip",
-            "mimeType": "image/jpeg",
-            "size": 100,
-            "isVideo": false,
-            "uploadedAt": "2026-01-01T00:00:00Z",
-            "fallbackDate": "2026-01-01T00:00:00Z"
-        ]]
+        json["catalogue"] = [
+            [
+                "fileId": "10",
+                "revision": dto.revision,
+                "name": "archive.zip",
+                "mimeType": "image/jpeg",
+                "size": 100,
+                "isVideo": false,
+                "uploadedAt": "2026-01-01T00:00:00Z",
+                "fallbackDate": "2026-01-01T00:00:00Z"
+            ]
+        ]
         json["availableFileIds"] = ["10"]; json["availableRevisions"] = ["10": dto.revision]; json["listedAt"] =
             "2026-01-01T00:00:00Z"
         XCTAssertThrowsError(try MediaLibraryIndex.decode(

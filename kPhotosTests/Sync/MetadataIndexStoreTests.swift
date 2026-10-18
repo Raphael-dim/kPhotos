@@ -24,14 +24,20 @@ import XCTest
 
 @MainActor
 final class MetadataIndexStoreTests: XCTestCase {
-    private func environment() throws -> (RealmAccessorImpl, Realm, PhotoManagerImpl, MetadataIndexStore) {
+    private struct Environment {
+        let realm: Realm
+        let writer: PhotoManagerImpl
+        let store: MetadataIndexStore
+    }
+
+    private func environment() throws -> Environment {
         let config = Realm.Configuration(
             inMemoryIdentifier: UUID().uuidString,
             objectTypes: [Photo.self, MetadataReadAttempt.self]
         )
         let realm = try Realm(configuration: config)
         let accessor = RealmAccessorImpl(configuration: config)
-        return (accessor, realm, PhotoManagerImpl(realm: accessor), MetadataIndexStore(realm: accessor))
+        return Environment(realm: realm, writer: PhotoManagerImpl(realm: accessor), store: MetadataIndexStore(realm: accessor))
     }
 
     func testBackupQueuePublishesStateChangesWithoutPhotoChanges() async throws {
@@ -57,7 +63,10 @@ final class MetadataIndexStoreTests: XCTestCase {
     }
 
     func testPausedPreparationPublishesCountsForItsOwnScope() async throws {
-        let (_, realm, writer, store) = try environment()
+        let environment = try environment()
+        let realm = environment.realm
+        let writer = environment.writer
+        let store = environment.store
         try await writer.upsert(photo())
         let defaults = try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString))
         defaults.set(true, forKey: "metadataPaused.7:root")
@@ -107,7 +116,10 @@ final class MetadataIndexStoreTests: XCTestCase {
     }
 
     func testUnsupportedReadIsTerminalAndRetryPreservesTrace() async throws {
-        let (_, realm, writer, store) = try environment()
+        let environment = try environment()
+        let realm = environment.realm
+        let writer = environment.writer
+        let store = environment.store
         let image = photo(); try await writer.upsert(image)
         try await store.recordFailure(photo: image, error: PhotoAPIError.invalidResponse, now: Date())
         let failed = try store.batch(driveId: 7, rootId: "root", limit: 10, now: Date())
@@ -119,7 +131,10 @@ final class MetadataIndexStoreTests: XCTestCase {
     }
 
     func testTransientFailuresHaveBoundedRetriesAndNewRevisionIsIndependent() async throws {
-        let (_, realm, writer, store) = try environment()
+        let environment = try environment()
+        let realm = environment.realm
+        let writer = environment.writer
+        let store = environment.store
         let image = photo(); try await writer.upsert(image)
         let now = Date(timeIntervalSince1970: 1000)
         try await store.recordFailure(photo: image, error: PhotoAPIError.network(underlying: "synthetic"), now: now)
@@ -140,7 +155,10 @@ final class MetadataIndexStoreTests: XCTestCase {
     }
 
     func testCompleteMissingGPSIsCompletedAndArchivesAreNeverQueued() async throws {
-        let (_, realm, writer, store) = try environment()
+        let environment = try environment()
+        let realm = environment.realm
+        let writer = environment.writer
+        let store = environment.store
         try await writer.upsert(photo()); try await writer.upsert(photo("archive", name: "image.zip"))
         try await writer.upsert(photo("other", root: "other"))
         var metadata = EmbeddedMediaMetadata(); metadata.partialRead = false; metadata.readerVersion = 2
@@ -152,7 +170,10 @@ final class MetadataIndexStoreTests: XCTestCase {
     }
 
     func testLegacyCoverageIsUpgradedAndPartialReadPreservesConfirmedGPS() async throws {
-        let (_, realm, writer, store) = try environment()
+        let environment = try environment()
+        let realm = environment.realm
+        let writer = environment.writer
+        let store = environment.store
         try await writer.upsert(photo())
         var legacy = EmbeddedMediaMetadata()
         legacy.coordinate = MediaCoordinate(latitude: 48, longitude: 2)
@@ -169,7 +190,10 @@ final class MetadataIndexStoreTests: XCTestCase {
     }
 
     func testNewIndexerResumesWithoutReadingCompletedOriginalAgain() async throws {
-        let (_, realm, writer, store) = try environment()
+        let environment = try environment()
+        let realm = environment.realm
+        let writer = environment.writer
+        let store = environment.store
         try await writer.upsert(photo("one")); try await writer.upsert(photo("two"))
         let api = IndexingAPI(); let defaults = try XCTUnwrap(UserDefaults(suiteName: UUID().uuidString))
         let first = EmbeddedMetadataIndexer(
@@ -195,7 +219,10 @@ final class MetadataIndexStoreTests: XCTestCase {
     }
 
     func testCanceledOriginalDoesNotBecomeFailureOrCompletion() async throws {
-        let (_, realm, writer, store) = try environment(); try await writer.upsert(photo())
+        let environment = try environment()
+        let realm = environment.realm
+        let writer = environment.writer
+        let store = environment.store; try await writer.upsert(photo())
         let api = IndexingAPI(); api.delayed = true
         let indexer = EmbeddedMetadataIndexer(api: api, writer: writer, store: store, reachability: IndexingNetwork())
         let task = Task { try await indexer.runBatch(driveId: 7, rootId: "root", limit: 1) }

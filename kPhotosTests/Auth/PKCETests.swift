@@ -45,10 +45,10 @@ final class PKCETests: XCTestCase {
     }
 
     func testMakeVerifier_isRandom_andBase64URLSafe() {
-        let a = PKCEChallenge.makeVerifier()
-        let b = PKCEChallenge.makeVerifier()
-        XCTAssertNotEqual(a, b, "Chaque verifier doit être tiré aléatoirement")
-        for verifier in [a, b] {
+        let first = PKCEChallenge.makeVerifier()
+        let second = PKCEChallenge.makeVerifier()
+        XCTAssertNotEqual(first, second, "Chaque verifier doit être tiré aléatoirement")
+        for verifier in [first, second] {
             // base64url sans padding — RFC 4648 §5.
             XCTAssertFalse(verifier.contains("+"))
             XCTAssertFalse(verifier.contains("/"))

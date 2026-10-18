@@ -24,18 +24,18 @@ import XCTest
 final class LivePhotoPairingTests: XCTestCase {
     private let identifier = "7142ABE5-762C-47C1-B1D6-92BF978C2152"
 
-    func testSameAppleIdentifierMakesOneGalleryItemEvenWhenFilenamesDiffer() {
-        let still = photo(id: "still", name: "IMG_0340(1).HEIC", identifier: identifier)
-        let motion = photo(id: "motion", name: "IMG_0340.MP4", identifier: identifier, isVideo: true)
+    func testSameAppleIdentifierMakesOneGalleryItemEvenWhenFilenamesDiffer() throws {
+        let still = try photo(id: "still", name: "IMG_0340(1).HEIC", identifier: identifier)
+        let motion = try photo(id: "motion", name: "IMG_0340.MP4", identifier: identifier, isVideo: true)
         let pairs = LivePhotoPairing(photos: [still, motion])
         XCTAssertEqual(pairs.motionByStillId[still.id]?.id, motion.id)
         XCTAssertEqual(pairs.attachMotion(to: still).liveMotionFileId, motion.id)
         XCTAssertEqual(items([still, motion]).map(\.cloudFileId), [still.id])
     }
 
-    func testSameFilenameWithDifferentAppleIdentifiersStaysSeparate() {
-        let still = photo(id: "still", name: "IMG_0340.HEIC", identifier: identifier)
-        let motion = photo(
+    func testSameFilenameWithDifferentAppleIdentifiersStaysSeparate() throws {
+        let still = try photo(id: "still", name: "IMG_0340.HEIC", identifier: identifier)
+        let motion = try photo(
             id: "motion",
             name: "IMG_0340.MP4",
             identifier: "BE95F668-7FF5-4601-B5F0-E93E2C1D3773",
@@ -45,30 +45,30 @@ final class LivePhotoPairingTests: XCTestCase {
         XCTAssertEqual(items([still, motion]).count, 2)
     }
 
-    func testAmbiguousStillAndLongVideoRemainSeparate() {
-        let still = photo(id: "still", name: "one.heic", identifier: identifier)
-        let duplicate = photo(id: "duplicate", name: "two.heic", identifier: identifier)
-        let motion = photo(id: "motion", name: "one.mp4", identifier: identifier, isVideo: true)
+    func testAmbiguousStillAndLongVideoRemainSeparate() throws {
+        let still = try photo(id: "still", name: "one.heic", identifier: identifier)
+        let duplicate = try photo(id: "duplicate", name: "two.heic", identifier: identifier)
+        let motion = try photo(id: "motion", name: "one.mp4", identifier: identifier, isVideo: true)
         XCTAssertTrue(LivePhotoPairing(photos: [still, duplicate, motion]).motionFileIds.isEmpty)
         XCTAssertEqual(items([still, duplicate, motion]).count, 3)
 
-        let longVideo = photo(id: "long", name: "one.mp4", identifier: identifier, isVideo: true, duration: 30)
+        let longVideo = try photo(id: "long", name: "one.mp4", identifier: identifier, isVideo: true, duration: 30)
         XCTAssertTrue(LivePhotoPairing(photos: [still, longVideo]).motionFileIds.isEmpty)
     }
 
-    func testIdenticalIdentifierInDifferentLibraryScopesDoesNotPair() {
-        let still = photo(id: "still", name: "one.heic", identifier: identifier)
-        var motion = photo(id: "motion", name: "one.mov", identifier: identifier, isVideo: true)
+    func testIdenticalIdentifierInDifferentLibraryScopesDoesNotPair() throws {
+        let still = try photo(id: "still", name: "one.heic", identifier: identifier)
+        var motion = try photo(id: "motion", name: "one.mov", identifier: identifier, isVideo: true)
         motion.libraryRootId = "another-root"
         XCTAssertTrue(LivePhotoPairing(photos: [still, motion]).motionFileIds.isEmpty)
     }
 
     @MainActor
-    func testMapKeepsLivePhotoCompanionAndHidesItsSeparateVideoPoint() {
-        var still = photo(id: "still", name: "photo.heic", identifier: identifier)
+    func testMapKeepsLivePhotoCompanionAndHidesItsSeparateVideoPoint() throws {
+        var still = try photo(id: "still", name: "photo.heic", identifier: identifier)
         still.coordinate = MediaCoordinate(latitude: 48, longitude: 2)
         still.locationSource = "embedded"
-        var motion = photo(id: "motion", name: "photo.mov", identifier: identifier, isVideo: true)
+        var motion = try photo(id: "motion", name: "photo.mov", identifier: identifier, isVideo: true)
         motion.coordinate = still.coordinate
         motion.locationSource = "embedded"
 
@@ -88,7 +88,7 @@ final class LivePhotoPairingTests: XCTestCase {
 
     private func photo(
         id: String, name: String, identifier: String, isVideo: Bool = false, duration: Double = 2
-    ) -> PhotoSnapshot {
+    ) throws -> PhotoSnapshot {
         var photo = PhotoSnapshot(
             id: id,
             driveId: 7,
@@ -108,7 +108,7 @@ final class LivePhotoPairingTests: XCTestCase {
         photo.liveContentIdentifier = identifier
         var metadata = EmbeddedMediaMetadata()
         metadata.duration = isVideo ? duration : nil
-        photo.embeddedMetadataJSON = String(decoding: try! JSONEncoder().encode(metadata), as: UTF8.self)
+        photo.embeddedMetadataJSON = try XCTUnwrap(String(data: JSONEncoder().encode(metadata), encoding: .utf8))
         return photo
     }
 }

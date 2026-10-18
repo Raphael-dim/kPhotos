@@ -24,13 +24,13 @@ import XCTest
 final class OAuth2ClientTests: XCTestCase {
     private let client = OAuth2Client(config: .infomaniak)
 
-    func testBuildAuthorizationURL_targetsAuthorizationEndpoint() {
+    func testBuildAuthorizationURL_targetsAuthorizationEndpoint() throws {
         let url = client.buildAuthorizationURL(state: "s", pkce: PKCEChallenge(verifier: "v"))
         XCTAssertEqual(url.host, "login.infomaniak.com")
         XCTAssertEqual(url.path, "/authorize")
     }
 
-    func testBuildAuthorizationURL_containsAllRequiredQueryItems() {
+    func testBuildAuthorizationURL_containsAllRequiredQueryItems() throws {
         let pkce = PKCEChallenge(verifier: "verifier-123")
         let url = client.buildAuthorizationURL(state: "state-xyz", pkce: pkce)
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
@@ -46,33 +46,33 @@ final class OAuth2ClientTests: XCTestCase {
     }
 
     func testExtractCode_returnsCode_onValidCallback() throws {
-        let url = URL(string: "app.kphotos://oauth/callback?code=ABC123&state=expected")!
+        let url = try (XCTUnwrap(URL(string: "app.kphotos://oauth/callback?code=ABC123&state=expected")))
         XCTAssertEqual(try client.extractCode(from: url, expectedState: "expected"), "ABC123")
     }
 
-    func testExtractCode_throwsStateMismatch_whenStateDiffers() {
-        let url = URL(string: "app.kphotos://oauth/callback?code=ABC&state=tampered")!
+    func testExtractCode_throwsStateMismatch_whenStateDiffers() throws {
+        let url = try (XCTUnwrap(URL(string: "app.kphotos://oauth/callback?code=ABC&state=tampered")))
         XCTAssertThrowsError(try client.extractCode(from: url, expectedState: "expected")) { error in
             XCTAssertEqual(error as? AuthError, .stateMismatch)
         }
     }
 
-    func testExtractCode_throwsMissingCode_whenCodeAbsent() {
-        let url = URL(string: "app.kphotos://oauth/callback?state=expected")!
+    func testExtractCode_throwsMissingCode_whenCodeAbsent() throws {
+        let url = try (XCTUnwrap(URL(string: "app.kphotos://oauth/callback?state=expected")))
         XCTAssertThrowsError(try client.extractCode(from: url, expectedState: "expected")) { error in
             XCTAssertEqual(error as? AuthError, .missingAuthorizationCode)
         }
     }
 
-    func testExtractCode_throwsMissingCode_whenCodeIsEmpty() {
-        let url = URL(string: "app.kphotos://oauth/callback?code=&state=expected")!
+    func testExtractCode_throwsMissingCode_whenCodeIsEmpty() throws {
+        let url = try (XCTUnwrap(URL(string: "app.kphotos://oauth/callback?code=&state=expected")))
         XCTAssertThrowsError(try client.extractCode(from: url, expectedState: "expected")) { error in
             XCTAssertEqual(error as? AuthError, .missingAuthorizationCode)
         }
     }
 
-    func testExtractCode_throwsMissingCode_whenCallbackHasNoQuery() {
-        let url = URL(string: "app.kphotos://oauth/callback")!
+    func testExtractCode_throwsMissingCode_whenCallbackHasNoQuery() throws {
+        let url = try (XCTUnwrap(URL(string: "app.kphotos://oauth/callback")))
         XCTAssertThrowsError(try client.extractCode(from: url, expectedState: "expected")) { error in
             XCTAssertEqual(error as? AuthError, .missingAuthorizationCode)
         }

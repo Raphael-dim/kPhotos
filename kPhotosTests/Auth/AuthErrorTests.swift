@@ -20,7 +20,7 @@
 import XCTest
 
 final class AuthErrorTests: XCTestCase {
-    func testEveryCase_hasNonEmptyLocalizedDescription() {
+    func testEveryCase_hasNonEmptyLocalizedDescription() throws {
         let cases: [AuthError] = [
             .notConfigured,
             .userCancelled,
@@ -37,21 +37,23 @@ final class AuthErrorTests: XCTestCase {
         }
     }
 
-    func testTokenExchangeFailed_includesReason() {
+    func testTokenExchangeFailed_includesReason() throws {
         XCTAssertEqual(
             AuthError.tokenExchangeFailed(reason: "HTTP 400").errorDescription,
             "Échange de token échoué : HTTP 400"
         )
     }
 
-    func testRefreshFailed_includesReason() {
+    func testRefreshFailed_includesReason() throws {
         XCTAssertTrue(
-            AuthError.refreshFailed(reason: "token révoqué")
-                .errorDescription!.contains("token révoqué")
+            try (XCTUnwrap(
+                AuthError.refreshFailed(reason: "token révoqué")
+                    .errorDescription
+            )).contains("token révoqué")
         )
     }
 
-    func testKeychainFailure_includesStatusCode() {
-        XCTAssertTrue(AuthError.keychainFailure(status: -42).errorDescription!.contains("-42"))
+    func testKeychainFailure_includesStatusCode() throws {
+        XCTAssertTrue(try (XCTUnwrap(AuthError.keychainFailure(status: -42).errorDescription)).contains("-42"))
     }
 }

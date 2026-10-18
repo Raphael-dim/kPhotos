@@ -25,7 +25,7 @@ import RealmSwift
 import XCTest
 
 final class EmbeddedMetadataTests: XCTestCase {
-    func testLivePhotoIdentifierComesFromAppleMakerNote() {
+    func testLivePhotoIdentifierComesFromAppleMakerNote() throws {
         let identifier = "7142ABE5-762C-47C1-B1D6-92BF978C2152"
         let metadata = EmbeddedMediaMetadata.image(properties: [
             kCGImagePropertyMakerAppleDictionary as String: ["17": identifier]
@@ -37,7 +37,7 @@ final class EmbeddedMetadataTests: XCTestCase {
         ]).livePhotoContentIdentifier)
     }
 
-    func testExifCoordinatesRespectHemisphereAndValidateBounds() {
+    func testExifCoordinatesRespectHemisphereAndValidateBounds() throws {
         let props: [String: Any] = [
             kCGImagePropertyGPSDictionary as String:
                 [
@@ -58,7 +58,7 @@ final class EmbeddedMetadataTests: XCTestCase {
         XCTAssertNil(MediaCoordinate(latitude: 91, longitude: 0))
     }
 
-    func testExifCaptureDateUsesOffsetWhenPresent() {
+    func testExifCaptureDateUsesOffsetWhenPresent() throws {
         let metadata = EmbeddedMediaMetadata.image(properties: [
             kCGImagePropertyExifDictionary as String:
                 [kCGImagePropertyExifDateTimeOriginal as String: "2018:08:05 18:32:24", "OffsetTimeOriginal": "+02:00"]
@@ -67,7 +67,7 @@ final class EmbeddedMetadataTests: XCTestCase {
         XCTAssertTrue(metadata.hasExplicitTimezone)
     }
 
-    func testExifDateWithoutTimezoneIsExplicitlyUnconfirmed() {
+    func testExifDateWithoutTimezoneIsExplicitlyUnconfirmed() throws {
         let metadata = EmbeddedMediaMetadata.image(properties: [
             kCGImagePropertyExifDictionary as String:
                 [kCGImagePropertyExifDateTimeOriginal as String: "2018:08:05 18:32:24"]
@@ -77,7 +77,7 @@ final class EmbeddedMetadataTests: XCTestCase {
         XCTAssertNotNil(metadata.captureDate)
     }
 
-    func testQuickTimeISO6709WithAltitudeAndInvalidCoordinates() {
+    func testQuickTimeISO6709WithAltitudeAndInvalidCoordinates() throws {
         XCTAssertEqual(
             EmbeddedMediaMetadata.iso6709("+46.1234-006.4321+004.500/"),
             MediaCoordinate(latitude: 46.1234, longitude: -6.4321)
@@ -123,7 +123,7 @@ final class EmbeddedMetadataTests: XCTestCase {
         XCTAssertEqual(EmbeddedMediaMetadata.image(url: misleadingURL)?.detectedImageType, "public.jpeg")
     }
 
-    func testMediaFilterAcceptsMissingMimeAndRefusesArchivesWithIncorrectMime() {
+    func testMediaFilterAcceptsMissingMimeAndRefusesArchivesWithIncorrectMime() throws {
         XCTAssertTrue(EmbeddedMetadataIndexer.isMedia(makePhoto(name: "original.HEIC", mimeType: "application/octet-stream")))
         XCTAssertFalse(EmbeddedMetadataIndexer.isMedia(makePhoto(name: "metadata.zip", mimeType: "image/jpeg")))
         XCTAssertFalse(RemoteFileDTO.isSupportedMedia(name: "metadata.zip", mimeType: "image/jpeg"))
@@ -133,7 +133,7 @@ final class EmbeddedMetadataTests: XCTestCase {
         var photo = makePhoto()
         var metadata = EmbeddedMediaMetadata()
         metadata.coordinate = MediaCoordinate(latitude: -12, longitude: 34)
-        photo.embeddedMetadataJSON = try String(decoding: JSONEncoder().encode(metadata), as: UTF8.self)
+        photo.embeddedMetadataJSON = try XCTUnwrap(String(data: JSONEncoder().encode(metadata), encoding: .utf8))
         photo.embeddedMetadataRevision = "revision"
         let snapshot = try PhotoSnapshot(PhotoManagerImpl.makePhoto(from: photo))
         XCTAssertEqual(snapshot.embeddedMetadata, metadata)
@@ -181,7 +181,7 @@ final class EmbeddedMetadataTests: XCTestCase {
     }
 
     @MainActor
-    func testMapAcceptsEmbeddedCloudGPSWithoutLocalPhotoAndRejectsLegacyGoogleGPS() {
+    func testMapAcceptsEmbeddedCloudGPSWithoutLocalPhotoAndRejectsLegacyGoogleGPS() throws {
         var photo = makePhoto()
         photo.coordinate = MediaCoordinate(latitude: -12, longitude: 34)
         photo.locationSource = "embedded"
@@ -219,16 +219,19 @@ private final class MetadataReadProtocol: URLProtocol {
     override static func canInit(with request: URLRequest) -> Bool { true }
     override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
-        let headers = ["Content-Length": String(Self.body.count), "Content-Range": "bytes 0-\(Self.body.count - 1)/100"]
-        let response = HTTPURLResponse(
-            url: request.url!,
-            statusCode: Self.status,
-            httpVersion: "HTTP/1.1",
-            headerFields: headers
-        )!
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Self.body)
-        client?.urlProtocolDidFinishLoading(self)
+        do { let headers = ["Content-Length": String(Self.body.count), "Content-Range": "bytes 0-\(Self.body.count - 1)/100"]
+            let response = try (XCTUnwrap(HTTPURLResponse(
+                url: XCTUnwrap(request.url),
+                statusCode: Self.status,
+                httpVersion: "HTTP/1.1",
+                headerFields: headers
+            )))
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Self.body)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
     }
 
     override func stopLoading() {}
@@ -243,28 +246,30 @@ final class BoundedMetadataReadTests: XCTestCase {
 
     func testPartialOriginalReadIsBounded() async throws {
         MetadataReadProtocol.status = 206; MetadataReadProtocol.body = Data(repeating: 7, count: 16)
-        let bytes = try await reader(limit: 32).read(url: URL(string: "https://synthetic.invalid/original")!)
+        let bytes = try await reader(limit: 32).read(url: XCTUnwrap(URL(string: "https://synthetic.invalid/original")))
         XCTAssertEqual(bytes.count, 16)
     }
 
-    func testServerIgnoringRangeForLargeOriginalIsRejected() async {
+    func testServerIgnoringRangeForLargeOriginalIsRejected() async throws {
         MetadataReadProtocol.status = 200; MetadataReadProtocol.body = Data(repeating: 7, count: 64)
         do {
-            _ = try await reader(limit: 32).read(url: URL(string: "https://synthetic.invalid/original")!)
+            _ = try await reader(limit: 32).read(url: XCTUnwrap(URL(string: "https://synthetic.invalid/original")))
             XCTFail("Must reject a full download larger than the budget")
         } catch { XCTAssertEqual(error as? PhotoAPIError, .invalidResponse) }
     }
 
-    func testOversizedRangeResponseIsRejected() async {
+    func testOversizedRangeResponseIsRejected() async throws {
         MetadataReadProtocol.status = 206; MetadataReadProtocol.body = Data(repeating: 7, count: 64)
         do {
-            _ = try await reader(limit: 32).read(url: URL(string: "https://synthetic.invalid/original")!)
+            _ = try await reader(limit: 32).read(url: XCTUnwrap(URL(string: "https://synthetic.invalid/original")))
             XCTFail("Must reject oversized range")
         } catch { XCTAssertEqual(error as? PhotoAPIError, .invalidResponse) }
     }
 
-    func testCanceledReadCompletesWithoutNetworkWork() async {
-        let task = Task { try await reader(limit: 32).read(url: URL(string: "https://synthetic.invalid/original")!) }
+    func testCanceledReadCompletesWithoutNetworkWork() async throws {
+        let task = Task {
+            try await reader(limit: 32).read(url: XCTUnwrap(URL(string: "https://synthetic.invalid/original")))
+        }
         task.cancel()
         do { _ = try await task.value; XCTFail("Must cancel") } catch { XCTAssertTrue(error is CancellationError) }
     }

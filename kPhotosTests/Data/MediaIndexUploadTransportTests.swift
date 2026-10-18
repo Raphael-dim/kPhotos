@@ -35,7 +35,7 @@ final class MediaIndexUploadTransportTests: XCTestCase {
     func testCacheUploadIsByteVerifiedAndUsesOnlyOwnedFolder() async throws {
         var uploaded = Data(); var uploads = 0
         IndexUploadProtocol.handler = { request in
-            let path = request.url!.path
+            let path = try (XCTUnwrap(request.url)).path
             if path.hasSuffix("/root/files") {
                 return try Self.json([
                     "data": [["id": "cache-folder", "name": ".kphotos-index", "type": "dir"]],
@@ -44,22 +44,30 @@ final class MediaIndexUploadTransportTests: XCTestCase {
             }
             if path.hasSuffix("/upload") {
                 uploads += 1
-                let items = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems!
-                let query = Dictionary(uniqueKeysWithValues: items.map { ($0.name, $0.value!) })
+                let items = try (XCTUnwrap(XCTUnwrap(URLComponents(
+                    url: XCTUnwrap(request.url),
+                    resolvingAgainstBaseURL: false
+                )).queryItems))
+                let query = try Dictionary(uniqueKeysWithValues: items.map { try ($0.name, XCTUnwrap($0.value)) })
                 XCTAssertEqual(query["directory_id"], "cache-folder"); XCTAssertEqual(query["file_name"], "index-ios-test.json")
                 XCTAssertEqual(query["conflict"], "error"); XCTAssertEqual(query["client_token"], "stable-token")
                 uploaded = try Self.body(request)
-                return try Self.json(["data": [
-                    "id": "cache-id",
-                    "name": "index-ios-test.json",
-                    "type": "file",
-                    "size": uploaded.count
-                ]])
+                return try Self.json([
+                    "data": [
+                        "id": "cache-id",
+                        "name": "index-ios-test.json",
+                        "type": "file",
+                        "size": uploaded.count
+                    ]
+                ])
             }
-            if path.hasSuffix("/download") { return (302, ["Location": "https://synthetic.invalid/cache"], Data()) }
+            if path
+                .hasSuffix("/download") {
+                return IndexUploadResponse(status: 302, headers: ["Location": "https://synthetic.invalid/cache"], body: Data())
+            }
             XCTAssertEqual(request.url?.host, "synthetic.invalid")
             XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
-            return (200, ["Content-Length": String(uploaded.count)], uploaded)
+            return IndexUploadResponse(status: 200, headers: ["Content-Length": String(uploaded.count)], body: uploaded)
         }
         let saved = try await api().saveMediaIndex(
             index(),
@@ -75,20 +83,29 @@ final class MediaIndexUploadTransportTests: XCTestCase {
     func testChangedCacheCannotBeOverwrittenAndOriginalNamesAreRejected() async throws {
         var uploads = 0
         IndexUploadProtocol.handler = { request in
-            let path = request.url!.path
+            let path = try (XCTUnwrap(request.url)).path
             if path.hasSuffix("/root/files") {
                 return try Self.json([
                     "data": [["id": "cache-folder", "name": ".kphotos-index", "type": "dir"]],
                     "has_more": false
                 ])
             }
-            if path.hasSuffix("/cache-id") { return try Self.json(["data": [
-                "id": "cache-id",
-                "name": "index-ios-test.json",
-                "parent_id": "cache-folder"
-            ]]) }
-            if path.hasSuffix("/download") { return (302, ["Location": "https://synthetic.invalid/cache"], Data()) }
-            if request.url?.host == "synthetic.invalid" { return (200, ["Content-Length": "7"], Data("changed".utf8)) }
+            if path.hasSuffix("/cache-id") { return try Self.json([
+                "data": [
+                    "id": "cache-id",
+                    "name": "index-ios-test.json",
+                    "parent_id": "cache-folder"
+                ]
+            ]) }
+            if path
+                .hasSuffix("/download") {
+                return IndexUploadResponse(status: 302, headers: ["Location": "https://synthetic.invalid/cache"], body: Data())
+            }
+            if request.url?
+                .host ==
+                "synthetic.invalid" {
+                return IndexUploadResponse(status: 200, headers: ["Content-Length": "7"], body: Data("changed".utf8))
+            }
             uploads += 1; throw PhotoAPIError.invalidResponse
         }
         let previous = MediaIndexUploadState(
@@ -113,8 +130,12 @@ final class MediaIndexUploadTransportTests: XCTestCase {
         XCTAssertEqual(uploads, 0)
     }
 
-    private static func json(_ object: Any) throws -> (Int, [String: String], Data) {
-        try (200, ["Content-Type": "application/json"], JSONSerialization.data(withJSONObject: object))
+    private static func json(_ object: Any) throws -> IndexUploadResponse {
+        try IndexUploadResponse(
+            status: 200,
+            headers: ["Content-Type": "application/json"],
+            body: JSONSerialization.data(withJSONObject: object)
+        )
     }
 
     private static func body(_ request: URLRequest) throws -> Data {
@@ -130,19 +151,30 @@ final class MediaIndexUploadTransportTests: XCTestCase {
     }
 }
 
+private struct IndexUploadResponse {
+    let status: Int
+    let headers: [String: String]
+    let body: Data
+}
+
 private final class IndexUploadProtocol: URLProtocol {
-    static var handler: ((URLRequest) throws -> (Int, [String: String], Data))?
+    static var handler: ((URLRequest) throws -> IndexUploadResponse)?
     override static func canInit(with request: URLRequest) -> Bool { true }
     override static func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         do {
-            let (status, headers, body) = try Self.handler!(request)
-            client?.urlProtocol(
+            let response = try XCTUnwrap(Self.handler)(request)
+            try client?.urlProtocol(
                 self,
-                didReceive: HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: headers)!,
+                didReceive: XCTUnwrap(HTTPURLResponse(
+                    url: XCTUnwrap(request.url),
+                    statusCode: response.status,
+                    httpVersion: nil,
+                    headerFields: response.headers
+                )),
                 cacheStoragePolicy: .notAllowed
             )
-            client?.urlProtocol(self, didLoad: body); client?.urlProtocolDidFinishLoading(self)
+            client?.urlProtocol(self, didLoad: response.body); client?.urlProtocolDidFinishLoading(self)
         } catch { client?.urlProtocol(self, didFailWithError: error) }
     }
 

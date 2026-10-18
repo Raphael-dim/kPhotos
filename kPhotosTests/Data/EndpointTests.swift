@@ -101,13 +101,13 @@ final class EndpointTests: XCTestCase {
             clientToken: "tok-abc"
         )
         XCTAssertEqual(endpoint.url.path, "/3/drive/7/upload")
-        let q = query(of: endpoint)
-        XCTAssertEqual(q["directory_id"], "10")
-        XCTAssertEqual(q["file_name"], "photo.jpg")
-        XCTAssertEqual(q["total_size"], "2048")
-        XCTAssertEqual(q["created_at"], "1577836800")
-        XCTAssertEqual(q["client_token"], "tok-abc")
-        XCTAssertEqual(q["conflict"], "error", "A collision must never replace existing bytes")
+        let query = query(of: endpoint)
+        XCTAssertEqual(query["directory_id"], "10")
+        XCTAssertEqual(query["file_name"], "photo.jpg")
+        XCTAssertEqual(query["total_size"], "2048")
+        XCTAssertEqual(query["created_at"], "1577836800")
+        XCTAssertEqual(query["client_token"], "tok-abc")
+        XCTAssertEqual(query["conflict"], "error", "A collision must never replace existing bytes")
     }
 
     func testPreview_withoutParams_hasNoQuery() {
@@ -120,10 +120,10 @@ final class EndpointTests: XCTestCase {
 
     func testPreview_withDimensions_carriesQuery() {
         let endpoint = Endpoint.preview(driveId: 7, fileId: "42", width: 800, height: 600, quality: 90)
-        let q = query(of: endpoint)
-        XCTAssertEqual(q["width"], "800")
-        XCTAssertEqual(q["height"], "600")
-        XCTAssertEqual(q["quality"], "90")
+        let query = query(of: endpoint)
+        XCTAssertEqual(query["width"], "800")
+        XCTAssertEqual(query["height"], "600")
+        XCTAssertEqual(query["quality"], "90")
     }
 
     func testThumbnailDownloadDeleteFileInfo_paths() {
