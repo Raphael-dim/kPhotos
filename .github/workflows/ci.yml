@@ -32,7 +32,7 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-version | python3 -c 'import sys; assert int(sys.stdin.read().split(".")[0]) >= 27'
 
       - name: Install Mise
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
         with:
           install: true
           cache: true
